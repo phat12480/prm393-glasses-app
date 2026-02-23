@@ -116,13 +116,22 @@ class DatabaseHelper {
       'password': '123',
       'full_name': 'Khách Trải Nghiệm',
       'role': 'CUSTOMER',
-      'created_at': DateTime.now().toIso8601String()
+      'created_at': DateTime.now().toIso8601String(),
     });
 
     // Tạo Category
-    int catFrame = await db.insert('categories', {'name': 'Gọng Thời Trang', 'type': 'FRAME'});
-    int catLens = await db.insert('categories', {'name': 'Tròng Thuốc', 'type': 'LENS'});
-    int catReady = await db.insert('categories', {'name': 'Kính Râm', 'type': 'READY'});
+    int catFrame = await db.insert('categories', {
+      'name': 'Gọng Thời Trang',
+      'type': 'FRAME',
+    });
+    int catLens = await db.insert('categories', {
+      'name': 'Tròng Thuốc',
+      'type': 'LENS',
+    });
+    int catReady = await db.insert('categories', {
+      'name': 'Kính Râm',
+      'type': 'READY',
+    });
 
     // Tạo Product - Gọng
     await db.insert('products', {
@@ -132,7 +141,7 @@ class DatabaseHelper {
       'price': 500000,
       'stock': 100,
       'status': 'ACTIVE',
-      'specs': '{"material": "Titanium", "shape": "Round"}'
+      'specs': '{"material": "Titanium", "shape": "Round"}',
     });
 
     // Tạo Product - Tròng
@@ -143,7 +152,7 @@ class DatabaseHelper {
       'price': 250000,
       'stock': 100,
       'status': 'ACTIVE',
-      'specs': '{"feature": "BlueCut", "index": "1.56"}'
+      'specs': '{"feature": "BlueCut", "index": "1.56"}',
     });
 
     // Tạo Product - Kính sẵn
@@ -154,7 +163,7 @@ class DatabaseHelper {
       'price': 150000,
       'stock': 50,
       'status': 'ACTIVE',
-      'specs': '{"uv": "UV400"}'
+      'specs': '{"uv": "UV400"}',
     });
   }
 
@@ -171,23 +180,45 @@ class DatabaseHelper {
   // Ta phải join bảng Categories để lọc theo type
   Future<List<Product>> getProductsByType(String type) async {
     final db = await instance.database;
-    final result = await db.rawQuery('''
+    final result = await db.rawQuery(
+      '''
       SELECT p.* FROM products p
       INNER JOIN categories c ON p.category_id = c.category_id
       WHERE c.type = ?
-    ''', [type]);
+    ''',
+      [type],
+    );
 
     return result.map((json) => Product.fromMap(json)).toList();
   }
 
+  // Lấy category_id theo type (FRAME, LENS, READY)
+  Future<int?> getCategoryIdByType(String type) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'categories',
+      where: 'type = ?',
+      whereArgs: [type],
+      limit: 1,
+    );
+    if (result.isEmpty) return null;
+    return result.first['category_id'] as int;
+  }
+
   // Thêm vào giỏ hàng (Logic đơn giản hóa)
-  Future<void> addToCart(int userId, int productId, int? lensId, double price) async {
+  Future<void> addToCart(
+    int userId,
+    int productId,
+    int? lensId,
+    double price,
+  ) async {
     final db = await instance.database;
 
     // 1. Tìm xem user có đơn hàng nào đang là CART không
-    List<Map> pendingOrders = await db.query('orders',
-        where: 'user_id = ? AND status = ?',
-        whereArgs: [userId, 'CART']
+    List<Map> pendingOrders = await db.query(
+      'orders',
+      where: 'user_id = ? AND status = ?',
+      whereArgs: [userId, 'CART'],
     );
 
     int orderId;
@@ -198,7 +229,7 @@ class DatabaseHelper {
         'order_date': DateTime.now().toIso8601String(),
         'total_amount': 0,
         'status': 'CART',
-        'payment_method': 'COD'
+        'payment_method': 'COD',
       });
     } else {
       orderId = pendingOrders.first['order_id'];
@@ -210,9 +241,64 @@ class DatabaseHelper {
       'product_id': productId,
       'lens_product_id': lensId, // Có thể null
       'quantity': 1,
-      'price': price
+      'price': price,
     });
 
-    print("Đã thêm sản phẩm $productId (Kèm lens: $lensId) vào giỏ hàng $orderId");
+    print(
+      "Đã thêm sản phẩm $productId (Kèm lens: $lensId) vào giỏ hàng $orderId",
+    );
+  }
+
+  // --- CRUD PRODUCT ---
+
+  // Create
+  Future<int> createProduct(Product product) async {
+    final db = await instance.database;
+    return await db.insert('products', product.toMap());
+  }
+
+  // Read All
+  Future<List<Product>> getAllProducts() async {
+    final db = await instance.database;
+    // Query joined with categories to allow better display if needed, but simple query is fine for now
+    final result = await db.query('products');
+    return result.map((json) => Product.fromMap(json)).toList();
+  }
+
+  // Read One
+  Future<Product?> getProductById(int id) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'products',
+      where: 'product_id = ?',
+      whereArgs: [id],
+    );
+
+    if (result.isNotEmpty) {
+      return Product.fromMap(result.first);
+    } else {
+      return null;
+    }
+  }
+
+  // Update
+  Future<int> updateProduct(Product product) async {
+    final db = await instance.database;
+    return await db.update(
+      'products',
+      product.toMap(),
+      where: 'product_id = ?',
+      whereArgs: [product.id],
+    );
+  }
+
+  // Delete
+  Future<int> deleteProduct(int id) async {
+    final db = await instance.database;
+    return await db.delete(
+      'products',
+      where: 'product_id = ?',
+      whereArgs: [id],
+    );
   }
 }

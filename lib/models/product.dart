@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class Product {
   final int? id;
   final int categoryId;
@@ -21,16 +23,27 @@ class Product {
     this.specs,
   });
 
+  Map<String, dynamic> get specsMap {
+    if (specs == null || specs!.isEmpty) return {};
+    try {
+      return jsonDecode(specs!);
+    } catch (e) {
+      return {};
+    }
+  }
+
   factory Product.fromMap(Map<String, dynamic> json) => Product(
     id: json['product_id'],
     categoryId: json['category_id'],
-    name: json['name'],
-    description: json['description'],
-    price: json['price'],
-    imageUrl: json['image_url'],
-    stock: json['stock'], // Đã sửa thành int theo diagram mới
-    status: json['status'],
-    specs: json['specs'],
+    name: (json['name'] ?? '') as String,
+    description: (json['description'] ?? '') as String,
+    price: (json['price'] is int)
+        ? (json['price'] as int).toDouble()
+        : (json['price'] ?? 0.0) as double,
+    imageUrl: (json['image_url'] ?? '') as String,
+    stock: (json['stock'] ?? 0) as int,
+    status: (json['status'] ?? '') as String,
+    specs: json['specs'] as String?,
   );
 
   Map<String, dynamic> toMap() {
@@ -45,5 +58,29 @@ class Product {
       'status': status,
       'specs': specs,
     };
+  }
+
+  Product copyWith({
+    int? id,
+    int? categoryId,
+    String? name,
+    String? description,
+    double? price,
+    String? imageUrl,
+    int? stock,
+    String? status,
+    String? specs,
+  }) {
+    return Product(
+      id: id ?? this.id,
+      categoryId: categoryId ?? this.categoryId,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      price: price ?? this.price,
+      imageUrl: imageUrl ?? this.imageUrl,
+      stock: stock ?? this.stock,
+      status: status ?? this.status,
+      specs: specs ?? this.specs,
+    );
   }
 }
