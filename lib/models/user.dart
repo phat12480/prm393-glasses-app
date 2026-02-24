@@ -21,13 +21,13 @@ class User {
 
   factory User.fromMap(Map<String, dynamic> json) => User(
     id: json['user_id'],
-    username: json['username'],
-    password: json['password'],
-    fullName: json['full_name'],
-    email: json['email'],
-    phone: json['phone'],
-    address: json['address'],
-    role: json['role'],
+    username: json['username'] ?? '',  // Thêm ?? '' để chống lỗi Null
+    password: json['password'] ?? '',
+    fullName: json['full_name'] ?? '',
+    email: json['email'] ?? '',
+    phone: json['phone'] ?? '',
+    address: json['address'] ?? '',
+    role: json['role'] ?? 'CUSTOMER',
   );
 
   Map<String, dynamic> toMap() {
@@ -40,7 +40,6 @@ class User {
       'phone': phone,
       'address': address,
       'role': role,
-      // created_at sẽ để Database tự sinh hoặc handle riêng
     };
   }
 }

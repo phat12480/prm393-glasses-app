@@ -110,7 +110,7 @@ class DatabaseHelper {
 
   // --- HÀM SEED DATA (Dữ liệu mẫu để test) ---
   Future _seedData(Database db) async {
-    // Tạo User mẫu
+    // User mẫu
     await db.insert('users', {
       'username': 'guest',
       'password': '123',
@@ -119,12 +119,12 @@ class DatabaseHelper {
       'created_at': DateTime.now().toIso8601String()
     });
 
-    // Tạo Category
+    // Category Mẫu
     int catFrame = await db.insert('categories', {'name': 'Gọng Thời Trang', 'type': 'FRAME'});
     int catLens = await db.insert('categories', {'name': 'Tròng Thuốc', 'type': 'LENS'});
     int catReady = await db.insert('categories', {'name': 'Kính Râm', 'type': 'READY'});
 
-    // Tạo Product - Gọng
+    // Product - Gọng Mẫu
     await db.insert('products', {
       'category_id': catFrame,
       'name': 'Gọng Titan Tròn',
@@ -135,7 +135,7 @@ class DatabaseHelper {
       'specs': '{"material": "Titanium", "shape": "Round"}'
     });
 
-    // Tạo Product - Tròng
+    // Product - Tròng Mẫu
     await db.insert('products', {
       'category_id': catLens,
       'name': 'Tròng Chống Ánh Sáng Xanh',
@@ -146,7 +146,7 @@ class DatabaseHelper {
       'specs': '{"feature": "BlueCut", "index": "1.56"}'
     });
 
-    // Tạo Product - Kính sẵn
+    // Product - Kính sẵn Mẫu
     await db.insert('products', {
       'category_id': catReady,
       'name': 'Kính Mát CoolNgau',
@@ -215,4 +215,88 @@ class DatabaseHelper {
 
     print("Đã thêm sản phẩm $productId (Kèm lens: $lensId) vào giỏ hàng $orderId");
   }
+
+  // --- CÁC HÀM XỬ LÝ USER (LOGIN/REGISTER) ---
+  // 1. Đăng ký User mới
+  Future<int> registerUser(User user) async {
+    final db = await instance.database;
+    try {
+      return await db.insert('users', user.toMap());
+    } catch (e) {
+      // Bắt lỗi nếu trùng Username hoặc Email (do ta đặt UNIQUE trong DB)
+      print("Lỗi đăng ký: $e");
+      return -1;
+    }
+  }
+
+  // 2. Đăng nhập bằng Username & Password
+  Future<User?> login(String username, String password) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'users',
+      where: 'username = ? AND password = ?',
+      whereArgs: [username, password],
+    );
+
+    if (result.isNotEmpty) {
+      return User.fromMap(result.first);
+    }
+    return null; // Sai tài khoản hoặc mật khẩu
+  }
+
+  // 3. Xử lý Google Login (Kiểm tra xem email đã có chưa, chưa thì tự tạo)
+  Future<User> handleGoogleLogin(String email, String fullName) async {
+    final db = await instance.database;
+
+    // Kiểm tra xem email này đã tồn tại trong SQLite chưa
+    final result = await db.query('users', where: 'email = ?', whereArgs: [email]);
+
+    if (result.isNotEmpty) {
+      // Đã từng đăng nhập bằng Google, trả về thông tin User
+      return User.fromMap(result.first);
+    } else {
+      // Lần đầu đăng nhập bằng Google -> Tạo User mới trong SQLite
+      // Lấy phần đầu của email làm username (VD: abc@gmail.com -> abc)
+      String generatedUsername = email.split('@')[0];
+
+      User newGoogleUser = User(
+        username: generatedUsername,
+        password: 'GOOGLE_AUTH_NO_PASSWORD', // Đánh dấu đây là acc Google
+        fullName: fullName,
+        email: email,
+        phone: '',
+        address: '',
+        role: 'CUSTOMER',
+      );
+
+      int id = await db.insert('users', {
+        ...newGoogleUser.toMap(),
+        'created_at': DateTime.now().toIso8601String()
+      });
+
+      return User(
+        id: id,
+        username: newGoogleUser.username,
+        password: newGoogleUser.password,
+        fullName: newGoogleUser.fullName,
+        email: newGoogleUser.email,
+        phone: newGoogleUser.phone,
+        address: newGoogleUser.address,
+        role: newGoogleUser.role,
+      );
+    }
+  }
+
+  // Hàm dùng để test các user trong DB SQLite
+  // Future<void> printAllUsers() async {
+  //   final db = await instance.database;
+  //   final List<Map<String, dynamic>> users = await db.query('users');
+  //
+  //   print("=== DANH SÁCH USER TRONG SQLITE ===");
+  //   for (var u in users) {
+  //     print("ID: ${u['user_id']} | Tên: ${u['full_name']} | Email: ${u['email']} | Pass: ${u['password']}");
+  //   }
+  //   print("===================================");
+  // }
+
 }
