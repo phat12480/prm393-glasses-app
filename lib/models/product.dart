@@ -24,12 +24,12 @@ class Product {
   factory Product.fromMap(Map<String, dynamic> json) => Product(
     id: json['product_id'],
     categoryId: json['category_id'],
-    name: json['name'],
-    description: json['description'],
-    price: json['price'],
-    imageUrl: json['image_url'],
-    stock: json['stock'], // Đã sửa thành int theo diagram mới
-    status: json['status'],
+    name: json['name'] ?? '',
+    description: json['description'] ?? '',
+    price: (json['price'] as num?)?.toDouble() ?? 0.0, // Ép kiểu an toàn tránh lỗi int/double
+    imageUrl: json['image_url'] ?? '',                 // Thêm ?? '' để chống lỗi Null
+    stock: json['stock'] ?? 0,
+    status: json['status'] ?? '',
     specs: json['specs'],
   );
 

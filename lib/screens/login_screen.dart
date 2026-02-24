@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import '../db/database_helper.dart';
 import '../models/user.dart';
+import '../presenters/login_presenter.dart';
 import 'register_screen.dart';
 import 'home_screen.dart';
 
@@ -12,88 +12,134 @@ class LoginScreen extends StatefulWidget {
   _LoginScreenState createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+// Chú ý: Ký hợp đồng implements LoginView
+class _LoginScreenState extends State<LoginScreen> implements LoginView {
+  late LoginPresenter _presenter;
+
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
-  void _loginNormal() async {
-    User? user = await DatabaseHelper.instance.login(
-        _usernameController.text,
-        _passwordController.text
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Khởi tạo Presenter
+    _presenter = LoginPresenter(this);
+  }
+
+  // ==========================================================
+  // THỰC THI CÁC HÀM CỦA HỢP ĐỒNG MVP
+  // ==========================================================
+  @override
+  void showLoading() {
+    setState(() => _isLoading = true);
+  }
+
+  @override
+  void hideLoading() {
+    setState(() => _isLoading = false);
+  }
+
+  @override
+  void onLoginSuccess(User user) {
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Xin chào, ${user.fullName}!"))
     );
-
-    if (user != null) {
-      _navigateToHome(user);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Sai tài khoản hoặc mật khẩu!")));
-    }
-  }
-
-  void _loginWithGoogle() async {
-    try {
-      // Kích hoạt popup đăng nhập Google
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-
-      if (googleUser != null) {
-        // Lấy thông tin từ Google và đẩy vào SQLite
-        User user = await DatabaseHelper.instance.handleGoogleLogin(
-            googleUser.email,
-            googleUser.displayName ?? 'Google User'
-        );
-
-        // GỌI HÀM KIỂM TRA TẠI ĐÂY
-        // await DatabaseHelper.instance.printAllUsers();
-
-        _navigateToHome(user);
-      }
-    } catch (error) {
-      print("Lỗi đăng nhập Google: $error");
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Lỗi đăng nhập Google")));
-    }
-  }
-
-  void _navigateToHome(User user) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Xin chào, ${user.fullName}!")));
-
-    // Điều hướng sang màn hình HomeScreen và truyền đối tượng user sang
+    // Đăng nhập thành công -> Chuyển sang Home
     Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => HomeScreen(user: user))
     );
   }
 
-  //Giao diện login
+  @override
+  void onLoginError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message))
+    );
+  }
+  // ==========================================================
+
+  // Hàm khi bấm nút "Đăng nhập"
+  void _onLoginNormalClicked() {
+    // Giao việc cho Presenter
+    _presenter.handleNormalLogin(
+        _usernameController.text.trim(),
+        _passwordController.text.trim()
+    );
+  }
+
+  // Hàm khi bấm nút "Google"
+  void _onLoginGoogleClicked() async {
+    try {
+      // View chỉ làm nhiệm vụ gọi cửa sổ đăng nhập của Google lên
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      if (googleUser != null) {
+        // Lấy được Email/Tên rồi thì ném cho Presenter xử lý logic với SQLite
+        _presenter.handleGoogleLogin(
+            googleUser.email,
+            googleUser.displayName ?? 'Google User'
+        );
+      }
+    } catch (error) {
+      onLoginError("Hủy đăng nhập hoặc lỗi Google: $error");
+    }
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-        child: Padding(
+        child: SingleChildScrollView( // Thêm ScrollView để tránh lỗi tràn màn hình khi bật bàn phím
           padding: const EdgeInsets.all(20.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text("BeautyEyes", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.blue)),
+              const Text("BeautyEyes", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
               const SizedBox(height: 40),
               TextField(controller: _usernameController, decoration: const InputDecoration(labelText: "Tên đăng nhập", border: OutlineInputBorder())),
               const SizedBox(height: 16),
               TextField(controller: _passwordController, decoration: const InputDecoration(labelText: "Mật khẩu", border: OutlineInputBorder()), obscureText: true),
               const SizedBox(height: 20),
+
+              // Nút Đăng nhập thường
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(onPressed: _loginNormal, child: const Text("Đăng nhập")),
+                height: 45,
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, foregroundColor: Colors.white),
+                    onPressed: _onLoginNormalClicked,
+                    child: const Text("Đăng nhập", style: TextStyle(fontSize: 16))
+                ),
               ),
+
               TextButton(
                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterScreen())),
                   child: const Text("Chưa có tài khoản? Đăng ký ngay")
               ),
               const Divider(height: 40),
+
+              // Nút Đăng nhập Google
               SizedBox(
                 width: double.infinity,
+                height: 45,
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.g_mobiledata, size: 30, color: Colors.red),
-                  label: const Text("Đăng nhập bằng Google"),
-                  onPressed: _loginWithGoogle,
+                  label: const Text("Đăng nhập bằng Google", style: TextStyle(fontSize: 16)),
+                  // Khóa nút nếu đang loading
+                  onPressed: _isLoading ? null : _onLoginGoogleClicked,
                 ),
               )
             ],

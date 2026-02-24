@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../db/database_helper.dart';
 import '../models/user.dart';
+import '../presenters/register_presenter.dart'; // Import Presenter vào
 
+// CHÚ Ý: Class State bây giờ "implements RegisterView" (Ký hợp đồng với Presenter)
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -9,38 +10,69 @@ class RegisterScreen extends StatefulWidget {
   _RegisterScreenState createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _RegisterScreenState extends State<RegisterScreen> implements RegisterView {
+  // Khai báo Presenter
+  late RegisterPresenter _presenter;
+
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController(); // Thêm controller mới
+  final _confirmPasswordController = TextEditingController();
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
 
-  // Thêm 2 biến để quản lý trạng thái ẩn/hiện mật khẩu
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _isLoading = false; // Biến trạng thái loading
 
-  void _handleRegister() async {
-    // 1. Kiểm tra xem các trường có bị bỏ trống không (Basic validation)
-    if (_usernameController.text.isEmpty ||
-        _passwordController.text.isEmpty ||
-        _fullNameController.text.isEmpty ||
-        _emailController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Vui lòng điền đầy đủ thông tin!"))
-      );
+  @override
+  void initState() {
+    super.initState();
+    // Khởi tạo Presenter và truyền chính màn hình này (this) vào làm View
+    _presenter = RegisterPresenter(this);
+  }
+
+  // ==========================================================
+  // THỰC THI CÁC HÀM CỦA HỢP ĐỒNG MVP (CONTRACT IMPLEMENTATION)
+  // ==========================================================
+  @override
+  void showLoading() {
+    setState(() => _isLoading = true);
+  }
+
+  @override
+  void hideLoading() {
+    setState(() => _isLoading = false);
+  }
+
+  @override
+  void onRegisterSuccess() {
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Đăng ký thành công!"))
+    );
+    Navigator.pop(context); // Quay lại màn hình Login
+  }
+
+  @override
+  void onRegisterError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message))
+    );
+  }
+  // ==========================================================
+
+  // Hàm khi người dùng bấm nút Đăng ký
+  void _onRegisterBtnClicked() {
+    if (_usernameController.text.isEmpty || _passwordController.text.isEmpty ||
+        _fullNameController.text.isEmpty || _emailController.text.isEmpty) {
+      onRegisterError("Vui lòng điền đầy đủ thông tin!");
       return;
     }
 
-    // 2. Kiểm tra mật khẩu và xác nhận mật khẩu có khớp nhau không
     if (_passwordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Mật khẩu xác nhận không khớp!"))
-      );
-      return; // Dừng lại, không gọi DB
+      onRegisterError("Mật khẩu xác nhận không khớp!");
+      return;
     }
 
-    // 3. Tiến hành lưu vào Database
     User newUser = User(
       username: _usernameController.text,
       password: _passwordController.text,
@@ -51,21 +83,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       role: 'CUSTOMER',
     );
 
-    int result = await DatabaseHelper.instance.registerUser(newUser);
-
-    if (result != -1) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Đăng ký thành công!"))
-      );
-      Navigator.pop(context); // Quay lại màn hình Login
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Tên đăng nhập hoặc Email đã tồn tại."))
-      );
-    }
+    // Bàn giao toàn bộ việc đăng ký cho Presenter xử lý!
+    _presenter.handleRegister(newUser);
   }
 
-  // Dọn dẹp bộ nhớ khi tắt màn hình
   @override
   void dispose() {
     _usernameController.dispose();
@@ -76,76 +97,53 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  //Giao diện Register
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Đăng ký tài khoản")),
-      body: SingleChildScrollView( // Thêm SingleChildScrollView để không bị lỗi UI khi bật bàn phím
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            TextField(
-                controller: _fullNameController,
-                decoration: const InputDecoration(labelText: "Họ và tên")
-            ),
+            TextField(controller: _fullNameController, decoration: const InputDecoration(labelText: "Họ và tên")),
             const SizedBox(height: 10),
-            TextField(
-                controller: _emailController,
-                decoration: const InputDecoration(labelText: "Email")
-            ),
+            TextField(controller: _emailController, decoration: const InputDecoration(labelText: "Email")),
             const SizedBox(height: 10),
-            TextField(
-                controller: _usernameController,
-                decoration: const InputDecoration(labelText: "Tên đăng nhập")
-            ),
+            TextField(controller: _usernameController, decoration: const InputDecoration(labelText: "Tên đăng nhập")),
             const SizedBox(height: 10),
-
-            // Trường Mật khẩu (Có icon ẩn/hiện)
             TextField(
               controller: _passwordController,
-              obscureText: _obscurePassword, // Sử dụng biến trạng thái
+              obscureText: _obscurePassword,
               decoration: InputDecoration(
                 labelText: "Mật khẩu",
                 suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _obscurePassword = !_obscurePassword; // Đảo ngược trạng thái
-                    });
-                  },
+                  icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                 ),
               ),
             ),
             const SizedBox(height: 10),
-
-            // Trường Xác nhận mật khẩu (Có icon ẩn/hiện)
             TextField(
               controller: _confirmPasswordController,
-              obscureText: _obscureConfirmPassword, // Sử dụng biến trạng thái
+              obscureText: _obscureConfirmPassword,
               decoration: InputDecoration(
                 labelText: "Xác nhận mật khẩu",
                 suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _obscureConfirmPassword = !_obscureConfirmPassword; // Đảo ngược trạng thái
-                    });
-                  },
+                  icon: Icon(_obscureConfirmPassword ? Icons.visibility_off : Icons.visibility),
+                  onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                 ),
               ),
             ),
-
             const SizedBox(height: 30),
+
+            // Xử lý nút bấm: Nếu đang loading thì hiện vòng xoay, ngược lại hiện nút
             SizedBox(
               width: double.infinity,
               height: 45,
-              child: ElevatedButton(
-                onPressed: _handleRegister,
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ElevatedButton(
+                onPressed: _onRegisterBtnClicked, // Gọi hàm mới
                 child: const Text("Đăng Ký", style: TextStyle(fontSize: 16)),
               ),
             )
