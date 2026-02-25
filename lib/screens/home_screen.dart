@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:carousel_slider/carousel_slider.dart'; // Import thư viện Slider
+import 'package:carousel_slider/carousel_slider.dart';
 import '../models/user.dart';
 import '../models/product.dart';
-import '../db/database_helper.dart';
+import '../presenters/home_presenter.dart'; // Import Presenter
+import 'product_detail_screen.dart'; // Import trang Chi tiết
 
 class HomeScreen extends StatefulWidget {
   final User user;
@@ -14,23 +15,58 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+// Ký hợp đồng implements HomeView
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin implements HomeView {
   late TabController _tabController;
+  late HomePresenter _presenter; // Khai báo Presenter
+
   final formatCurrency = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
 
-  // Danh sách ảnh mẫu cho Hero Banner (Có thể thay bằng link ảnh của bạn)
+  // Biến lưu trữ dữ liệu sản phẩm
+  bool _isLoading = true;
+  Map<String, List<Product>> _productsMap = {
+    'READY': [],
+    'FRAME': [],
+    'LENS': [],
+  };
+
   final List<String> imgList = [
-    'https://images.unsplash.com/photo-1511499767150-a48a237f0083?q=80&w=1000&auto=format&fit=crop', // Ảnh cô gái đeo kính
-    'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?q=80&w=1000&auto=format&fit=crop', // Ảnh kính mát
-    'https://images.unsplash.com/photo-1509695507497-903c140c43b0?q=80&w=1000&auto=format&fit=crop', // Ảnh thời trang
+    'https://images.unsplash.com/photo-1511499767150-a48a237f0083?q=80&w=1000&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?q=80&w=1000&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1509695507497-903c140c43b0?q=80&w=1000&auto=format&fit=crop',
   ];
 
   @override
   void initState() {
     super.initState();
-    // Khởi tạo 4 Tab như yêu cầu
     _tabController = TabController(length: 4, vsync: this);
+
+    // Khởi tạo Presenter và gọi hàm tải dữ liệu ngay lập tức
+    _presenter = HomePresenter(this);
+    _presenter.loadAllProducts();
   }
+
+  // ==========================================================
+  // THỰC THI HỢP ĐỒNG MVP
+  // ==========================================================
+  @override
+  void showLoading() => setState(() => _isLoading = true);
+
+  @override
+  void hideLoading() => setState(() => _isLoading = false);
+
+  @override
+  void onLoadProductsSuccess(Map<String, List<Product>> categorizedProducts) {
+    setState(() {
+      _productsMap = categorizedProducts;
+    });
+  }
+
+  @override
+  void onLoadError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.red));
+  }
+  // ==========================================================
 
   @override
   void dispose() {
@@ -38,15 +74,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  // --- WIDGET: HERO BANNER (SWIPER) ---
   Widget _buildHeroBanner() {
     return CarouselSlider(
       options: CarouselOptions(
-        height: 180.0,
-        autoPlay: true,
-        autoPlayInterval: const Duration(seconds: 3), // Chạy 3s/ảnh
-        enlargeCenterPage: true, // Hiệu ứng phóng to ảnh ở giữa
-        viewportFraction: 0.9,
+        height: 180.0, autoPlay: true, autoPlayInterval: const Duration(seconds: 3),
+        enlargeCenterPage: true, viewportFraction: 0.9,
       ),
       items: imgList.map((item) => Container(
         margin: const EdgeInsets.only(top: 10, bottom: 10),
@@ -59,42 +91,28 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  // --- WIDGET: GIỚI THIỆU THƯƠNG HIỆU ---
   Widget _buildBrandIntro() {
+    // ... (Giữ nguyên code phần Giới thiệu thương hiệu cũ) ...
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          color: Colors.white, borderRadius: BorderRadius.circular(16),
           boxShadow: [BoxShadow(color: Colors.blue.withOpacity(0.1), blurRadius: 10, spreadRadius: 2)],
         ),
         child: Column(
           children: [
-            const Text(
-              "Về BeautyEyes",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueAccent),
-            ),
+            const Text("Về BeautyEyes", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
             const SizedBox(height: 8),
-            const Text(
-              "Chúng tôi mang đến những chiếc kính không chỉ để nhìn rõ thế giới, mà còn để thế giới nhìn rõ phong cách của bạn. Tự tin, thanh lịch và hiện đại.",
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: Colors.black54, height: 1.5),
-            ),
+            const Text("Chúng tôi mang đến những chiếc kính không chỉ để nhìn rõ thế giới, mà còn để thế giới nhìn rõ phong cách của bạn. Tự tin, thanh lịch và hiện đại.", textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: Colors.black54, height: 1.5)),
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Image.network(
                 'https://images.unsplash.com/photo-1556306535-0f09a536f0bl?q=80&w=1000&auto=format&fit=crop',
-                height: 100,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                // Xử lý lỗi nếu link ảnh hỏng
-                errorBuilder: (context, error, stackTrace) => Container(
-                  height: 100, color: Colors.blue[50],
-                  child: const Icon(Icons.storefront, size: 40, color: Colors.blue),
-                ),
+                height: 100, width: double.infinity, fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(height: 100, color: Colors.blue[50], child: const Icon(Icons.storefront, size: 40, color: Colors.blue)),
               ),
             ),
           ],
@@ -103,76 +121,79 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  // --- WIDGET: DANH SÁCH SẢN PHẨM ---
+  // Cập nhật lại phần _buildProductGrid (Không dùng FutureBuilder nữa)
   Widget _buildProductGrid(String type) {
-    return FutureBuilder<List<Product>>(
-      future: DatabaseHelper.instance.getProductsByType(type),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(child: Text("Chưa có sản phẩm nào.", style: TextStyle(color: Colors.grey)));
-        }
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-        return GridView.builder(
-          padding: const EdgeInsets.all(16),
-          // Không cho GridView tự cuộn, để NestedScrollView quản lý cuộn
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            childAspectRatio: 0.72,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
+    final products = _productsMap[type] ?? [];
+
+    if (products.isEmpty) {
+      return const Center(child: Text("Chưa có sản phẩm nào.", style: TextStyle(color: Colors.grey)));
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2, childAspectRatio: 0.72, crossAxisSpacing: 16, mainAxisSpacing: 16,
+      ),
+      itemCount: products.length,
+      itemBuilder: (context, index) {
+        final product = products[index];
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white, borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 4))],
           ),
-          itemCount: snapshot.data!.length,
-          itemBuilder: (context, index) {
-            final product = snapshot.data![index];
-            return Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 4))],
-              ),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Chọn: ${product.name}")));
-                },
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Container(
-                        width: double.infinity,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFF3F6F8), // Màu nền xám xanh nhạt mềm mại
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                        ),
-                        child: const Icon(Icons.remove_red_eye, size: 40, color: Colors.blueGrey),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(product.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          const SizedBox(height: 6),
-                          Text(formatCurrency.format(product.price), style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 15)),
-                        ],
-                      ),
-                    ),
-                  ],
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () {
+              // Nhảy sang trang Detail chuẩn MVP
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProductDetailScreen(product: product, user: widget.user),
                 ),
-              ),
-            );
-          },
+              );
+            },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF3F6F8), borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                    ),
+                    child: product.imageUrl.isNotEmpty
+                        ? ClipRRect(
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                        child: Image.network(product.imageUrl, fit: BoxFit.cover)
+                    )
+                        : const Icon(Icons.remove_red_eye, size: 40, color: Colors.blueGrey),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(product.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 6),
+                      Text(formatCurrency.format(product.price), style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 15)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
   }
 
-  // --- WIDGET: TAB MUA THEO NHU CẦU (CUSTOM KÍNH) ---
   Widget _buildCustomComboTab() {
     return Center(
       child: Padding(
@@ -188,17 +209,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             const SizedBox(height: 24),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-                foregroundColor: Colors.white,
+                backgroundColor: Colors.blueAccent, foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               ),
               icon: const Icon(Icons.play_arrow),
               label: const Text("Bắt đầu chọn Gọng", style: TextStyle(fontSize: 16)),
-              onPressed: () {
-                // TODO: Chuyển sang luồng chọn Custom Kính
-                _tabController.animateTo(1); // Tạm thời chuyển sang tab Gọng
-              },
+              onPressed: () => _tabController.animateTo(1),
             )
           ],
         ),
@@ -208,34 +225,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    // Màu Blue Sky chủ đạo
     const Color skyBlue = Color(0xFF56CCF2);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA), // Nền xám rất nhạt cho toàn app
-      // NestedScrollView giúp cuộn mượt mà cả Header và List
+      backgroundColor: const Color(0xFFF8F9FA),
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
-            // AppBar (Header)
             SliverAppBar(
-              backgroundColor: skyBlue,
-              expandedHeight: 60.0,
-              floating: true,
-              pinned: true, // Ghim thanh AppBar ở trên cùng
-              elevation: 0,
+              backgroundColor: skyBlue, expandedHeight: 60.0, floating: true, pinned: true, elevation: 0,
               title: GestureDetector(
-                onTap: () {
-                  // Chuyển sang trang Profile khi bấm vào tên
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => ProfileScreen(user: widget.user)));
-                },
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => ProfileScreen(user: widget.user))),
                 child: Row(
                   children: [
-                    const CircleAvatar(
-                      backgroundColor: Colors.white,
-                      radius: 16,
-                      child: Icon(Icons.person, size: 20, color: skyBlue),
-                    ),
+                    const CircleAvatar(backgroundColor: Colors.white, radius: 16, child: Icon(Icons.person, size: 20, color: skyBlue)),
                     const SizedBox(width: 10),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -248,49 +251,23 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
               ),
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.shopping_cart, color: Colors.white),
-                  onPressed: () {},
-                ),
+                IconButton(icon: const Icon(Icons.shopping_cart, color: Colors.white), onPressed: () {}),
               ],
             ),
-
-            // Phần Body phía trên TabBar (Hero + Intro)
             SliverToBoxAdapter(
-              child: Column(
-                children: [
-                  _buildHeroBanner(),
-                  _buildBrandIntro(),
-                  const SizedBox(height: 10),
-                ],
-              ),
+              child: Column(children: [_buildHeroBanner(), _buildBrandIntro(), const SizedBox(height: 10)]),
             ),
-
-            // Dải TabBar (Sẽ dính chặt lên trên khi cuộn xuống qua phần Hero)
             SliverPersistentHeader(
               pinned: true,
               delegate: _SliverAppBarDelegate(
                 TabBar(
-                  controller: _tabController,
-                  isScrollable: true, // Cho phép vuốt ngang nếu text quá dài
-                  labelColor: Colors.blueAccent,
-                  unselectedLabelColor: Colors.grey,
-                  indicatorColor: Colors.blueAccent,
-                  indicatorWeight: 3,
-                  labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-                  tabs: const [
-                    Tab(text: "KÍNH CÓ SẴN"),
-                    Tab(text: "GỌNG KÍNH"),
-                    Tab(text: "TRÒNG KÍNH"),
-                    Tab(text: "MUA THEO NHU CẦU"),
-                  ],
+                  controller: _tabController, isScrollable: true, labelColor: Colors.blueAccent, unselectedLabelColor: Colors.grey, indicatorColor: Colors.blueAccent, indicatorWeight: 3, labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+                  tabs: const [Tab(text: "KÍNH CÓ SẴN"), Tab(text: "GỌNG KÍNH"), Tab(text: "TRÒNG KÍNH"), Tab(text: "MUA THEO NHU CẦU")],
                 ),
               ),
             ),
           ];
         },
-
-        // Nội dung của từng Tab
         body: TabBarView(
           controller: _tabController,
           children: [
@@ -305,42 +282,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 }
 
-// --- CLASS HỖ TRỢ ĐỂ GHIM TABBAR LÊN TOP KHI CUỘN ---
 class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   _SliverAppBarDelegate(this._tabBar);
   final TabBar _tabBar;
-
-  @override
-  double get minExtent => _tabBar.preferredSize.height;
-  @override
-  double get maxExtent => _tabBar.preferredSize.height;
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: Colors.white, // Nền trắng cho thanh Tab để dễ đọc
-      child: _tabBar,
-    );
-  }
-
-  @override
-  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
-    return false;
-  }
+  @override double get minExtent => _tabBar.preferredSize.height;
+  @override double get maxExtent => _tabBar.preferredSize.height;
+  @override Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) => Container(color: Colors.white, child: _tabBar);
+  @override bool shouldRebuild(_SliverAppBarDelegate oldDelegate) => false;
 }
 
-// --- TRANG PROFILE (TẠM THỜI ĐỂ TRÁNH LỖI KHI BẤM VÀO TÊN) ---
 class ProfileScreen extends StatelessWidget {
   final User user;
   const ProfileScreen({super.key, required this.user});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Hồ sơ của tôi"), backgroundColor: const Color(0xFF56CCF2)),
-      body: Center(
-        child: Text("Thông tin của: ${user.fullName}\nEmail: ${user.email}", textAlign: TextAlign.center, style: const TextStyle(fontSize: 18)),
-      ),
-    );
+  @override Widget build(BuildContext context) {
+    return Scaffold(appBar: AppBar(title: const Text("Hồ sơ của tôi"), backgroundColor: const Color(0xFF56CCF2)), body: Center(child: Text("Thông tin của: ${user.fullName}\nEmail: ${user.email}", textAlign: TextAlign.center, style: const TextStyle(fontSize: 18))));
   }
 }
