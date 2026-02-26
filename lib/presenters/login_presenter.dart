@@ -15,7 +15,7 @@ class LoginPresenter {
 
   LoginPresenter(this._view);
 
-  // Xử lý đăng nhập bằng Username & Password
+  // Hàm xử lý đăng nhập bằng Username & Password
   void handleNormalLogin(String username, String password) async {
     // Validate cơ bản
     if (username.isEmpty || password.isEmpty) {
@@ -38,7 +38,7 @@ class LoginPresenter {
     }
   }
 
-  // Xử lý đăng nhập bằng Google
+  // Hàm xử lý đăng nhập bằng Google
   void handleGoogleLogin(String email, String fullName) async {
     _view.showLoading();
 

@@ -5,8 +5,8 @@ import '../db/database_helper.dart';
 abstract class HomeView {
   void showLoading();
   void hideLoading();
-  // Trả về một Map chứa danh sách sản phẩm theo từng loại
   void onLoadProductsSuccess(Map<String, List<Product>> categorizedProducts);
+  void onUpdateCartCount(int count); // Cập nhật số đếm giỏ hàng
   void onLoadError(String message);
 }
 
@@ -16,17 +16,14 @@ class HomePresenter {
 
   HomePresenter(this._view);
 
-  // Hàm tải toàn bộ sản phẩm khi mới vào màn hình Home
+  // Hàm Tải danh sách sản phẩm
   void loadAllProducts() async {
     _view.showLoading();
-
     try {
-      // Tải song song cả 3 loại sản phẩm từ SQLite
       final readyProducts = await DatabaseHelper.instance.getProductsByType('READY');
       final frameProducts = await DatabaseHelper.instance.getProductsByType('FRAME');
       final lensProducts = await DatabaseHelper.instance.getProductsByType('LENS');
 
-      // Gói gọn lại thành 1 Map và gửi về cho Giao diện
       final Map<String, List<Product>> result = {
         'READY': readyProducts,
         'FRAME': frameProducts,
@@ -39,6 +36,16 @@ class HomePresenter {
     } catch (e) {
       _view.hideLoading();
       _view.onLoadError("Lỗi tải dữ liệu: $e");
+    }
+  }
+
+  // Hàm đếm số lượng giỏ hàng
+  void loadCartCount(int userId) async {
+    try {
+      int count = await DatabaseHelper.instance.getCartItemCount(userId);
+      _view.onUpdateCartCount(count);
+    } catch (e) {
+      print("Lỗi đếm giỏ hàng: $e");
     }
   }
 }

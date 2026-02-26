@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
 import '../models/product.dart';
 import '../models/user.dart';
 import '../presenters/product_detail_presenter.dart';
+import 'cart_screen.dart'; // Import trang Giỏ hàng
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -17,12 +19,17 @@ class ProductDetailScreen extends StatefulWidget {
 class _ProductDetailScreenState extends State<ProductDetailScreen> implements ProductDetailView {
   late ProductDetailPresenter _presenter;
   final formatCurrency = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
+
   bool _isLoading = false;
+  String? _selectedColor;
+  int _cartItemCount = 0; // Biến Lưu số lượng giỏ hàng
+  int _quantity = 1; // Khởi tạo số lượng mặc định là 1
 
   @override
   void initState() {
     super.initState();
-    _presenter = ProductDetailPresenter(this); // Khởi tạo Presenter
+    _presenter = ProductDetailPresenter(this);
+    _presenter.loadCartCount(widget.user.id!); // Đếm giỏ hàng ngay khi vào trang
   }
 
   // --- THỰC THI HỢP ĐỒNG MVP ---
@@ -35,11 +42,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> implements Pr
   @override
   void onAddToCartSuccess() {
     ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text("Đã thêm vào giỏ hàng thành công!"),
-            backgroundColor: Colors.green
-        )
+        const SnackBar(content: Text("Đã thêm vào giỏ hàng thành công!"), backgroundColor: Colors.green)
     );
+    // Cập nhật lại số đếm ngay lập tức sau khi thêm hàng thành công
+    _presenter.loadCartCount(widget.user.id!);
   }
 
   @override
@@ -49,35 +55,168 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> implements Pr
     );
   }
 
-  // --- CÁC HÀM XỬ LÝ NÚT BẤM ---
-  void _handleAddToCart() {
-    _presenter.addToCart(widget.user, widget.product);
+  // Nhận số đếm từ Presenter
+  @override
+  void onUpdateCartCount(int count) {
+    setState(() {
+      _cartItemCount = count;
+    });
   }
 
-  void _handleBuyNow() {
-    _presenter.addToCart(widget.user, widget.product);
-    // TODO: Chuyển hướng sang màn hình Giỏ Hàng hoặc Thanh Toán
-    ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Chuyển sang trang thanh toán..."))
+  // --- HÀM XỬ LÝ MÀU SẮC ---
+  List<String> _getAvailableColors() {
+    if (widget.product.specs == null || widget.product.specs!.isEmpty) return [];
+    try {
+      final Map<String, dynamic> parsedSpecs = jsonDecode(widget.product.specs!);
+      if (parsedSpecs.containsKey('colors')) { // Kiểm tra nếu có key colors thì sẽ parse
+        return List<String>.from(parsedSpecs['colors']);
+      }
+    } catch (e) {
+      print("Lỗi parse specs: $e");
+    }
+    return [];
+  }
+
+  // --- WIDGET HIỂN THỊ MÀU SẮC ---
+  Widget _buildColorSelector() {
+    final colors = _getAvailableColors();
+    if (colors.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 15),
+        const Text("Chọn màu sắc:", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 10,
+          children: colors.map((color) {
+            final isSelected = _selectedColor == color;
+            return ChoiceChip(
+              label: Text(color),
+              selected: isSelected,
+              selectedColor: Colors.blueAccent.withOpacity(0.2),
+              labelStyle: TextStyle(
+                  color: isSelected ? Colors.blueAccent : Colors.black87,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal
+              ),
+              onSelected: (selected) {
+                setState(() => _selectedColor = selected ? color : null);
+              },
+            );
+          }).toList(),
+        ),
+      ],
     );
+  }
+
+  // --- WIDGET CHỌN SỐ LƯỢNG ---
+  Widget _buildQuantitySelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 15),
+        const Text("Số lượng:", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        // Khung chứa các nút cộng trừ
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min, // Giúp khung ôm sát vào các nút
+            children: [
+              // Nút Trừ
+              IconButton(
+                icon: const Icon(Icons.remove, size: 20),
+                onPressed: _quantity > 1
+                    ? () => setState(() => _quantity--)
+                    : null,
+              ),
+              // Hiển thị số lượng
+              SizedBox(
+                width: 30,
+                child: Text('$_quantity', textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+              // Nút Cộng
+              IconButton(
+                icon: const Icon(Icons.add, size: 20),
+                onPressed: _quantity < widget.product.stock
+                    ? () => setState(() => _quantity++)
+                    : null,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // --- CÁC HÀM XỬ LÝ NÚT BẤM ---
+  // Add to cart
+  void _handleAddToCart() {
+    if (_getAvailableColors().isNotEmpty && _selectedColor == null) {
+      onError("Vui lòng chọn màu sắc trước khi thêm vào giỏ hàng!");
+      return;
+    }
+    _presenter.addToCart(widget.user, widget.product, color: _selectedColor, quantity: _quantity);
+  }
+
+  //Buy now
+  void _handleBuyNow() async {
+    if (_getAvailableColors().isNotEmpty && _selectedColor == null) {
+      onError("Vui lòng chọn màu sắc trước khi mua!");
+      return;
+    }
+    _presenter.addToCart(widget.user, widget.product, color: _selectedColor, quantity: _quantity);
+
+    // Mua ngay thì nhảy thẳng sang trang Cart
+    await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => CartScreen(user: widget.user))
+    );
+    // Khi từ Cart quay về, nhớ đếm lại số lượng
+    _presenter.loadCartCount(widget.user.id!);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA), // Màu nền xám nhạt
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
         title: const Text("Chi tiết sản phẩm", style: TextStyle(color: Colors.black)),
+        // Icon giỏ hàng
+        actions: [
+          Badge(
+            label: Text('$_cartItemCount', style: const TextStyle(color: Colors.white)),
+            isLabelVisible: _cartItemCount > 0,
+            backgroundColor: Colors.redAccent,
+            offset: const Offset(-5, 5),
+            child: IconButton(
+                icon: const Icon(Icons.shopping_cart, color: Colors.black), // Icon màu đen cho hợp nền
+                onPressed: () async {
+                  // Mở trang giỏ hàng
+                  await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => CartScreen(user: widget.user))
+                  );
+                  // Khi từ giỏ hàng quay lại trang này, đếm lại số hàng
+                  _presenter.loadCartCount(widget.user.id!);
+                }
+            ),
+          ),
+          const SizedBox(width: 10),
+        ],
       ),
 
-      // Sử dụng Stack để có thể ghim thanh nút bấm xuống đáy màn hình
       body: Stack(
         children: [
           SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 100), // Chừa chỗ cho thanh bottom
+            padding: const EdgeInsets.only(bottom: 100),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -88,7 +227,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> implements Pr
                   decoration: BoxDecoration(
                     color: Colors.white,
                     image: DecorationImage(
-                      // Nếu không có link ảnh thì hiển thị ảnh placeholder
                       image: widget.product.imageUrl.isNotEmpty
                           ? NetworkImage(widget.product.imageUrl)
                           : const NetworkImage('https://images.unsplash.com/photo-1577803645773-f96470509666?q=80&w=1000&auto=format&fit=crop') as ImageProvider,
@@ -97,7 +235,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> implements Pr
                   ),
                 ),
 
-                // 2. Khối Thông tin (Tên, Giá, Trạng thái)
+                // 2. Khối Thông tin
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
@@ -105,7 +243,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> implements Pr
                     color: Colors.white,
                     borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                   ),
-                  transform: Matrix4.translationValues(0.0, -20.0, 0.0), // Kéo khối này lên đè vào ảnh một chút
+                  transform: Matrix4.translationValues(0.0, -20.0, 0.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -125,7 +263,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> implements Pr
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              widget.product.stock > 0 ? "Còn hàng" : "Hết hàng",
+                              // CẬP NHẬT HIỂN THỊ SỐ TỒN KHO Ở ĐÂY
+                              widget.product.stock > 0 ? "Kho: ${widget.product.stock}" : "Hết hàng",
                               style: TextStyle(
                                   color: widget.product.stock > 0 ? Colors.green : Colors.red,
                                   fontWeight: FontWeight.bold
@@ -139,6 +278,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> implements Pr
                         formatCurrency.format(widget.product.price),
                         style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blueAccent),
                       ),
+
+                      // Hiển thị phần chọn màu (nếu có)
+                      _buildColorSelector(),
+
+                      // GỌI WIDGET CHỌN SỐ LƯỢNG VÀO ĐÂY (chỉ hiện nếu còn hàng)
+                      if (widget.product.stock > 0) _buildQuantitySelector(),
+
                       const SizedBox(height: 20),
 
                       // 3. Khối Mô tả
@@ -155,7 +301,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> implements Pr
             ),
           ),
 
-          // 4. Thanh Nút bấm (Ghim ở đáy)
+          // 4. Thanh Nút bấm
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
@@ -164,10 +310,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> implements Pr
                 color: Colors.white,
                 boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))],
               ),
-              child: SafeArea( // Tránh vướng thanh điều hướng dưới đáy đt
+              child: SafeArea(
                 child: Row(
                   children: [
-                    // Nút Thêm Giỏ Hàng
                     Expanded(
                       flex: 1,
                       child: OutlinedButton(
@@ -183,8 +328,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> implements Pr
                       ),
                     ),
                     const SizedBox(width: 15),
-
-                    // Nút Mua Ngay
                     Expanded(
                       flex: 3,
                       child: ElevatedButton(

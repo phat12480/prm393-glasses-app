@@ -5,6 +5,8 @@ import '../models/user.dart';
 import '../models/product.dart';
 import '../presenters/home_presenter.dart'; // Import Presenter
 import 'product_detail_screen.dart'; // Import trang Chi tiết
+import 'custom_combo_screen.dart'; // Import trang chọn kính theo yêu cầu
+import 'cart_screen.dart'; // Import trang giỏ hàng
 
 class HomeScreen extends StatefulWidget {
   final User user;
@@ -24,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   // Biến lưu trữ dữ liệu sản phẩm
   bool _isLoading = true;
+  int _cartItemCount = 0; // THÊM BIẾN LƯU SỐ LƯỢNG GIỎ HÀNG
   Map<String, List<Product>> _productsMap = {
     'READY': [],
     'FRAME': [],
@@ -43,7 +46,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
     // Khởi tạo Presenter và gọi hàm tải dữ liệu ngay lập tức
     _presenter = HomePresenter(this);
-    _presenter.loadAllProducts();
+    _presenter.loadAllProducts(); // Bảo presenter tải các product lên
+    _presenter.loadCartCount(widget.user.id!); // BẢO PRESENTER ĐẾM GIỎ HÀNG KHI MỞ APP
   }
 
   // ==========================================================
@@ -74,6 +78,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.dispose();
   }
 
+  // THÊM HÀM NÀY VÀO ĐỂ NHẬN SỐ ĐẾM TỪ PRESENTER
+  @override
+  void onUpdateCartCount(int count) {
+    setState(() {
+      _cartItemCount = count;
+    });
+  }
+
+  // Section 1: Widget banner
   Widget _buildHeroBanner() {
     return CarouselSlider(
       options: CarouselOptions(
@@ -91,8 +104,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
+  // Section 2: Widget giới thiệu thương hiệu
   Widget _buildBrandIntro() {
-    // ... (Giữ nguyên code phần Giới thiệu thương hiệu cũ) ...
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
       child: Container(
@@ -121,7 +134,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  // Cập nhật lại phần _buildProductGrid (Không dùng FutureBuilder nữa)
+  // Section 3: Widget danh sách sản phẩm
   Widget _buildProductGrid(String type) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -149,14 +162,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
-            onTap: () {
-              // Nhảy sang trang Detail chuẩn MVP
-              Navigator.push(
+            onTap: () async {
+              await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => ProductDetailScreen(product: product, user: widget.user),
                 ),
               );
+              // Bắt buộc đếm lại giỏ hàng khi thoát trang chi tiết
+              _presenter.loadCartCount(widget.user.id!);
             },
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -194,6 +208,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
+  // Section 4: Widget chọn kính theo yêu cầu
   Widget _buildCustomComboTab() {
     return Center(
       child: Padding(
@@ -215,7 +230,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ),
               icon: const Icon(Icons.play_arrow),
               label: const Text("Bắt đầu chọn Gọng", style: TextStyle(fontSize: 16)),
-              onPressed: () => _tabController.animateTo(1),
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CustomComboScreen(user: widget.user),
+                  ),
+                );
+                // Bắt buộc đếm lại giỏ hàng khi thoát màn hình Combo
+                _presenter.loadCartCount(widget.user.id!);
+              },
             )
           ],
         ),
@@ -251,7 +275,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
               ),
               actions: [
-                IconButton(icon: const Icon(Icons.shopping_cart, color: Colors.white), onPressed: () {}),
+                // Bọc IconButton trong Widget Badge
+                Badge(
+                  label: Text('$_cartItemCount', style: const TextStyle(color: Colors.white)),
+                  isLabelVisible: _cartItemCount > 0, // Chỉ hiện nốt đỏ nếu có hàng
+                  backgroundColor: Colors.redAccent,
+                  offset: const Offset(-5, 5), // Chỉnh vị trí dấu chấm đỏ lệch vào trong 1 xíu
+                  child: IconButton(
+                      icon: const Icon(Icons.shopping_cart, color: Colors.white),
+                      onPressed: () async {
+                        // Dùng await để app chờ bạn đi chợ (vào màn hình Cart)
+                        await Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => CartScreen(user: widget.user))
+                        );
+                        // KHI QUAY LẠI TRANG CHỦ, BẢO PRESENTER ĐẾM LẠI GIỎ HÀNG!
+                        _presenter.loadCartCount(widget.user.id!);
+                      }
+                  ),
+                ),
+                const SizedBox(width: 10), // Cách lề phải một chút cho đẹp
               ],
             ),
             SliverToBoxAdapter(
