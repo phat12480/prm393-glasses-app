@@ -3,12 +3,21 @@ import 'package:path/path.dart';
 import '../models/category.dart';
 import '../models/product.dart';
 import '../models/user.dart';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
 
   DatabaseHelper._init();
+
+  // --- HÀM MÃ HÓA MẬT KHẨU (SHA-256) ---
+  String _hashPassword(String password) {
+    var bytes = utf8.encode(password); // Chuyển chuỗi thành bytes
+    var digest = sha256.convert(bytes); // Mã hóa SHA-256
+    return digest.toString(); // Trả về chuỗi đã được mã hóa
+  }
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -108,14 +117,15 @@ class DatabaseHelper {
     // Gọi hàm tạo dữ liệu mẫu
     await _seedData(db);
   }
-
+  // ==========================================
   // --- HÀM SEED DATA (Dữ liệu mẫu phong phú) ---
+  // ==========================================
   Future _seedData(Database db) async {
-    // 1. User mẫu
+  // 1. User mẫu
     await db.insert('users', {
       'username': 'guest',
-      'password': '123',
-      'full_name': 'Khách Trải Nghiệm',
+      'password': _hashPassword('123'), // MÃ HÓA MẬT KHẨU MẪU
+      'full_name': 'Guest',
       'role': 'CUSTOMER',
       'created_at': DateTime.now().toIso8601String()
     });
@@ -125,9 +135,7 @@ class DatabaseHelper {
     int catLens = await db.insert('categories', {'name': 'Tròng Thuốc', 'type': 'LENS'});
     int catReady = await db.insert('categories', {'name': 'Kính Râm', 'type': 'READY'});
 
-    // ==========================================
-    // 3. THÊM CÁC SẢN PHẨM: GỌNG KÍNH (FRAME)
-    // ==========================================
+    // 3. Gọng kính mẫu (FRAME)
     await db.insert('products', {
       'category_id': catFrame,
       'name': 'Gọng Titan Tròn Cổ Điển',
@@ -161,9 +169,7 @@ class DatabaseHelper {
       'specs': '{"colors": ["Đồi Mồi", "Đen Bóng", "Đỏ Rượu"], "material": "Acetate", "shape": "Cat-eye"}'
     });
 
-    // ==========================================
-    // 4. THÊM CÁC SẢN PHẨM: TRÒNG KÍNH (LENS)
-    // ==========================================
+    // 4. Tròng kính mẫu (LENS)
     await db.insert('products', {
       'category_id': catLens,
       'name': 'Tròng Chống Ánh Sáng Xanh',
@@ -197,9 +203,7 @@ class DatabaseHelper {
       'specs': '{"feature": "Anti-scratch, Super Thin", "index": "1.67"}'
     });
 
-    // ==========================================
-    // 5. THÊM CÁC SẢN PHẨM: KÍNH RÂM (READY)
-    // ==========================================
+    // 5. Kính râm mẫu
     await db.insert('products', {
       'category_id': catReady,
       'name': 'Kính Râm Phân Cực Polarized',
@@ -227,14 +231,14 @@ class DatabaseHelper {
   // --- CÁC HÀM TRUY VẤN CƠ BẢN (Helper Methods) ---
   // ==========================================================
 
-  // Lấy tất cả danh mục
+  // 1. Lấy tất cả danh mục
   Future<List<Category>> getAllCategories() async {
     final db = await instance.database;
     final result = await db.query('categories');
     return result.map((json) => Category.fromMap(json)).toList();
   }
 
-  // Lấy sản phẩm theo loại (FRAME, LENS, READY)
+  // 2. Lấy sản phẩm theo loại (FRAME, LENS, READY)
   // Ta phải join bảng Categories để lọc theo type
   Future<List<Product>> getProductsByType(String type) async {
     final db = await instance.database;
@@ -247,10 +251,10 @@ class DatabaseHelper {
     return result.map((json) => Product.fromMap(json)).toList();
   }
 
-  // Thêm vào giỏ hàng
+  // 3. Thêm vào giỏ hàng
   Future<void> addToCart(int userId, int productId, int? lensId, double price, {String? color, int quantity = 1}) async {
     final db = await instance.database;
-    // 1. Tìm xem user có đơn hàng nào đang là CART không
+    // 3.1. Tìm xem user có đơn hàng nào đang là CART không
     List<Map> pendingOrders = await db.query('orders',
         where: 'user_id = ? AND status = ?',
         whereArgs: [userId, 'CART']
@@ -290,9 +294,20 @@ class DatabaseHelper {
   Future<int> registerUser(User user) async {
     final db = await instance.database;
     try {
-      return await db.insert('users', user.toMap());
+      // TẠO BẢN SAO CỦA USER VỚI MẬT KHẨU ĐÃ ĐƯỢC MÃ HÓA
+      User hashedUser = User(
+        id: user.id,
+        username: user.username,
+        password: _hashPassword(user.password), // MÃ HÓA TẠI ĐÂY
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        address: user.address,
+        role: user.role,
+      );
+
+      return await db.insert('users', hashedUser.toMap());
     } catch (e) {
-      // Bắt lỗi nếu trùng Username hoặc Email (do ta đặt UNIQUE trong DB)
       print("Lỗi đăng ký: $e");
       return -1;
     }
@@ -301,10 +316,14 @@ class DatabaseHelper {
   // 2. Đăng nhập bằng Username & Password
   Future<User?> login(String username, String password) async {
     final db = await instance.database;
+
+    // MÃ HÓA MẬT KHẨU NGƯỜI DÙNG NHẬP VÀO
+    String hashedPassword = _hashPassword(password);
+
     final result = await db.query(
       'users',
       where: 'username = ? AND password = ?',
-      whereArgs: [username, password],
+      whereArgs: [username, hashedPassword], // So sánh chuỗi đã mã hóa
     );
 
     if (result.isNotEmpty) {
