@@ -357,6 +357,32 @@ class DatabaseHelper {
   }
 
   // ==========================================================
+  // --- CÁC HÀM XỬ LÝ PROFILE & LỊCH SỬ ĐƠN HÀNG ---
+  // ==========================================================
+
+  // 1. Cập nhật thông tin người dùng
+  Future<int> updateUser(User user) async {
+    final db = await instance.database;
+    return await db.update(
+      'users',
+      user.toMap(),
+      where: 'user_id = ?',
+      whereArgs: [user.id],
+    );
+  }
+
+  // 2. Lấy danh sách lịch sử đơn hàng (Bỏ qua giỏ hàng 'CART')
+  Future<List<Map<String, dynamic>>> getOrderHistory(int userId) async {
+    final db = await instance.database;
+    return await db.query(
+        'orders',
+        where: 'user_id = ? AND status != ?',
+        whereArgs: [userId, 'CART'],
+        orderBy: 'order_id DESC' // Đơn hàng mới nhất xếp trên
+    );
+  }
+
+  // ==========================================================
   // --- CÁC HÀM XỬ LÝ GIỎ HÀNG VÀ THANH TOÁN ---
   // ==========================================================
 
