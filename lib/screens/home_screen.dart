@@ -4,8 +4,9 @@ import 'package:carousel_slider/carousel_slider.dart';
 import '../models/user.dart';
 import '../models/product.dart';
 import '../presenters/home_presenter.dart'; // Import Presenter
-import 'product_detail_screen.dart'; // Import trang Chi tiết
+import 'product_detail_screen.dart'; // Import trang Chi tiết sản phẩm
 import 'custom_combo_screen.dart'; // Import trang chọn kính theo yêu cầu
+import 'profile_screen.dart'; // Import trang profile
 import 'cart_screen.dart'; // Import trang giỏ hàng
 
 class HomeScreen extends StatefulWidget {
@@ -332,12 +333,4 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   @override double get maxExtent => _tabBar.preferredSize.height;
   @override Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) => Container(color: Colors.white, child: _tabBar);
   @override bool shouldRebuild(_SliverAppBarDelegate oldDelegate) => false;
-}
-
-class ProfileScreen extends StatelessWidget {
-  final User user;
-  const ProfileScreen({super.key, required this.user});
-  @override Widget build(BuildContext context) {
-    return Scaffold(appBar: AppBar(title: const Text("Hồ sơ của tôi"), backgroundColor: const Color(0xFF56CCF2)), body: Center(child: Text("Thông tin của: ${user.fullName}\nEmail: ${user.email}", textAlign: TextAlign.center, style: const TextStyle(fontSize: 18))));
-  }
 }
