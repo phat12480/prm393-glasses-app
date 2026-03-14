@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/user.dart';
 import '../presenters/cart_presenter.dart';
+import 'checkout_screen.dart'; // Import trang thanh toán mới
 
 class CartScreen extends StatefulWidget {
   final User user;
@@ -52,34 +53,10 @@ class _CartScreenState extends State<CartScreen> implements CartView {
     });
   }
 
+  // Hàm này vẫn giữ lại để tuân thủ hợp đồng CartView (dù ít dùng tới ở bước này)
   @override
   void onCheckoutSuccess() {
-    // Hiện thông báo và quay về trang chủ
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 80),
-            const SizedBox(height: 16),
-            const Text("Đặt hàng thành công!", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            const Text("Cảm ơn bạn đã mua sắm tại BeautyEyes.", textAlign: TextAlign.center),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context); // Đóng Dialog
-                Navigator.pop(context); // Quay về Home
-              },
-              child: const Text("Về Trang Chủ"),
-            )
-          ],
-        ),
-      ),
-    );
+    // Không làm gì ở đây vì việc báo thành công đã chuyển sang CheckoutScreen
   }
 
   @override
@@ -145,7 +122,6 @@ class _CartScreenState extends State<CartScreen> implements CartView {
                           width: 30,
                           color: Colors.grey.shade100,
                           alignment: Alignment.center,
-                          // ĐÃ BỎ CHỮ "x", CHỈ CÒN SỐ
                           child: Text('$quantity', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                         ),
                         IconButton(
@@ -175,6 +151,8 @@ class _CartScreenState extends State<CartScreen> implements CartView {
             // Nút Xóa (Thùng rác)
             IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.red),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
               onPressed: () {
                 showDialog(
                     context: context,
@@ -265,7 +243,20 @@ class _CartScreenState extends State<CartScreen> implements CartView {
                         backgroundColor: Colors.blueAccent,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      onPressed: () => _presenter.checkout(widget.user.id!),
+                      onPressed: () {
+                        if (_cartItems.isEmpty) return;
+
+                        // ĐIỀU HƯỚNG SANG TRANG CHECKOUT
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => CheckoutScreen(user: widget.user, totalAmount: _totalPrice)
+                            )
+                        ).then((_) {
+                          // Nếu người dùng ấn nút Back từ trang Checkout về, ta tải lại giỏ hàng cho chắc
+                          _presenter.loadCart(widget.user.id!);
+                        });
+                      },
                       child: const Text("THANH TOÁN NGAY", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                     ),
                   )

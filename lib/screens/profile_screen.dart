@@ -4,6 +4,7 @@ import '../presenters/profile_presenter.dart';
 import 'login_screen.dart';
 import 'edit_profile_screen.dart';
 import 'order_history_screen.dart';
+import '../db/database_helper.dart';
 
 class ProfileScreen extends StatefulWidget {
   final User user;
@@ -22,7 +23,20 @@ class _ProfileScreenState extends State<ProfileScreen> implements ProfileView {
   void initState() {
     super.initState();
     _presenter = ProfilePresenter(this);
-    _currentUser = widget.user;
+    _currentUser = widget.user; // Gán tạm user cũ
+
+    // GỌI HÀM LẤY DỮ LIỆU MỚI NHẤT
+    _loadLatestUser();
+  }
+
+  // Hàm tự động cập nhật Avatar/Thông tin mới nhất
+  void _loadLatestUser() async {
+    User? latestUser = await DatabaseHelper.instance.getUserById(widget.user.id!);
+    if (latestUser != null && mounted) {
+      setState(() {
+        _currentUser = latestUser;
+      });
+    }
   }
 
   @override

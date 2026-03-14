@@ -251,42 +251,6 @@ class DatabaseHelper {
     return result.map((json) => Product.fromMap(json)).toList();
   }
 
-  // 3. Thêm vào giỏ hàng
-  Future<void> addToCart(int userId, int productId, int? lensId, double price, {String? color, int quantity = 1}) async {
-    final db = await instance.database;
-    // 3.1. Tìm xem user có đơn hàng nào đang là CART không
-    List<Map> pendingOrders = await db.query('orders',
-        where: 'user_id = ? AND status = ?',
-        whereArgs: [userId, 'CART']
-    );
-
-    int orderId;
-    if (pendingOrders.isEmpty) {
-      // Nếu chưa có giỏ hàng, tạo mới
-      orderId = await db.insert('orders', {
-        'user_id': userId,
-        'order_date': DateTime.now().toIso8601String(),
-        'total_amount': 0,
-        'status': 'CART',
-        'payment_method': 'COD'
-      });
-    } else {
-      orderId = pendingOrders.first['order_id'];
-    }
-
-    // 2. Thêm item vào bảng order_items
-    await db.insert('order_items', {
-      'order_id': orderId,
-      'product_id': productId,
-      'lens_product_id': lensId,
-      'selected_color': color,
-      'quantity': quantity, // LƯU SỐ LƯỢNG VÀO DB
-      'price': price * quantity // NHÂN ĐƠN GIÁ VỚI SỐ LƯỢNG
-    });
-
-    print("Đã thêm sản phẩm $productId (Kèm lens: $lensId) vào giỏ hàng $orderId");
-  }
-
   // ==========================================================
   // --- CÁC HÀM XỬ LÝ USER (LOGIN/REGISTER) ---
   // ==========================================================
@@ -375,6 +339,21 @@ class DatabaseHelper {
     }
   }
 
+  // 4. Lấy thông tin User mới nhất theo ID
+  Future<User?> getUserById(int userId) async {
+    final db = await instance.database;
+    final result = await db.query(
+        'users',
+        where: 'user_id = ?',
+        whereArgs: [userId]
+    );
+
+    if (result.isNotEmpty) {
+      return User.fromMap(result.first);
+    }
+    return null;
+  }
+
   // ==========================================================
   // --- CÁC HÀM XỬ LÝ PROFILE & LỊCH SỬ ĐƠN HÀNG ---
   // ==========================================================
@@ -425,35 +404,84 @@ class DatabaseHelper {
     ''', [orderId]);
   }
 
+  Future<void> addToCart(int userId, int productId, int? lensId, double price, {String? color, int quantity = 1}) async {
+    final db = await instance.database;
+    List<Map> pendingOrders = await db.query('orders', where: 'user_id = ? AND status = ?', whereArgs: [userId, 'CART']);
+
+    int orderId;
+    if (pendingOrders.isEmpty) {
+      orderId = await db.insert('orders', {
+        'user_id': userId,
+        'order_date': DateTime.now().toIso8601String(),
+        'total_amount': 0,
+        'status': 'CART',
+        'payment_method': 'COD'
+      });
+    } else {
+      orderId = pendingOrders.first['order_id'] as int;
+    }
+
+    await db.insert('order_items', {
+      'order_id': orderId,
+      'product_id': productId,
+      'lens_product_id': lensId,
+      'selected_color': color,
+      'quantity': quantity,
+      'price': price * quantity
+    });
+
+    // CẬP NHẬT LẠI TỔNG TIỀN ĐƠN HÀNG
+    await _updateOrderTotal(orderId);
+  }
+
   // 2. Cập nhật số lượng và tính lại tiền
   Future<void> updateCartItemQuantity(int orderItemId, int newQuantity, double unitPrice) async {
     final db = await instance.database;
+
+    // 1. Cập nhật chi tiết item
     await db.update(
         'order_items',
-        {
-          'quantity': newQuantity,
-          'price': unitPrice * newQuantity // Nhân lại đơn giá với số lượng mới
-        },
+        {'quantity': newQuantity, 'price': unitPrice * newQuantity},
         where: 'order_item_id = ?',
         whereArgs: [orderItemId]
     );
+
+    // 2. Tìm ID đơn hàng và cập nhật tổng tiền
+    final item = await db.query('order_items', columns: ['order_id'], where: 'order_item_id = ?', whereArgs: [orderItemId]);
+    if (item.isNotEmpty) {
+      await _updateOrderTotal(item.first['order_id'] as int);
+    }
   }
 
   // 3. Xóa một sản phẩm khỏi giỏ hàng
   Future<void> removeFromCart(int orderItemId) async {
     final db = await instance.database;
+
+    // 1. Lấy ID đơn hàng trước khi xóa item
+    final item = await db.query('order_items', columns: ['order_id'], where: 'order_item_id = ?', whereArgs: [orderItemId]);
+
+    // 2. Xóa item
     await db.delete('order_items', where: 'order_item_id = ?', whereArgs: [orderItemId]);
+
+    // 3. Cập nhật lại tổng tiền đơn hàng
+    if (item.isNotEmpty) {
+      await _updateOrderTotal(item.first['order_id'] as int);
+    }
   }
 
-  // 4. Thanh toán (Đổi trạng thái CART -> PENDING)
-  Future<void> checkoutCart(int userId) async {
+  // 4. Thanh toán (Đổi trạng thái CART -> PENDING và lưu hình thức)
+  Future<void> checkoutCart(int userId, String paymentMethod) async {
     final db = await instance.database;
     final orders = await db.query('orders', where: 'user_id = ? AND status = ?', whereArgs: [userId, 'CART']);
     if (orders.isNotEmpty) {
       int orderId = orders.first['order_id'] as int;
       await db.update(
           'orders',
-          {'status': 'PENDING', 'order_date': DateTime.now().toIso8601String()},
+          {
+            'status': 'PENDING',
+            'order_date': DateTime.now().toIso8601String(),
+            'payment_method': paymentMethod // Lưu COD hoặc MOMO
+          },
           where: 'order_id = ?',
           whereArgs: [orderId]
       );
@@ -471,6 +499,45 @@ class DatabaseHelper {
     final items = await db.query('order_items', where: 'order_id = ?', whereArgs: [orderId]);
 
     return items.length; // Trả về số lượng món hàng
+  }
+
+  // --- Hàm TẠO ĐƠN HÀNG TRỰC TIẾP (MUA NGAY - KHÔNG QUA GIỎ HÀNG) ---
+  Future<void> createDirectOrder(int userId, String paymentMethod, int productId, int? lensId, String? color, int quantity, double price) async {
+    final db = await instance.database;
+
+    // 1. Tạo order với trạng thái PENDING luôn (Bỏ qua bước CART)
+    int orderId = await db.insert('orders', {
+      'user_id': userId,
+      'order_date': DateTime.now().toIso8601String(),
+      'total_amount': price * quantity,
+      'status': 'PENDING',
+      'payment_method': paymentMethod
+    });
+
+    // 2. Lưu 1 sản phẩm duy nhất đó vào order_items
+    await db.insert('order_items', {
+      'order_id': orderId,
+      'product_id': productId,
+      'lens_product_id': lensId,
+      'selected_color': color,
+      'quantity': quantity,
+      'price': price * quantity
+    });
+  }
+
+  // --- HÀM TỰ ĐỘNG TÍNH LẠI TỔNG TIỀN CỦA ĐƠN HÀNG ---
+  Future<void> _updateOrderTotal(int orderId) async {
+    final db = await instance.database;
+    // Tính tổng tất cả price trong bảng order_items của đơn hàng này
+    final result = await db.rawQuery('SELECT SUM(price) as total FROM order_items WHERE order_id = ?', [orderId]);
+
+    double total = 0.0;
+    if (result.isNotEmpty && result.first['total'] != null) {
+      total = (result.first['total'] as num).toDouble();
+    }
+
+    // Cập nhật lại cột total_amount trong bảng orders
+    await db.update('orders', {'total_amount': total}, where: 'order_id = ?', whereArgs: [orderId]);
   }
 
 }

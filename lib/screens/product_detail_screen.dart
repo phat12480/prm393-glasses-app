@@ -4,7 +4,8 @@ import 'dart:convert';
 import '../models/product.dart';
 import '../models/user.dart';
 import '../presenters/product_detail_presenter.dart';
-import 'cart_screen.dart'; // Import trang Giỏ hàng
+import 'cart_screen.dart';
+import 'checkout_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -55,12 +56,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> implements Pr
     );
   }
 
-  // Nhận số đếm từ Presenter
+  // Nhận số đếm từ Presenter để cập nhật Badge Giỏ hàng
   @override
   void onUpdateCartCount(int count) {
-    setState(() {
-      _cartItemCount = count;
-    });
+    if (mounted) {
+      setState(() {
+        _cartItemCount = count;
+      });
+    }
+  }
+
+  // Thực thi khi bấm mua ngay
+  @override
+  void onBuyNowSuccess(double totalAmount) async {
+    await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => CheckoutScreen(
+          user: widget.user,
+          totalAmount: totalAmount,
+          // ĐÓNG GÓI SẢN PHẨM MANG THEO
+          directProduct: widget.product,
+          directQuantity: _quantity,
+          directColor: _selectedColor,
+        ))
+    );
+    // Nếu khách bấm nút quay lại (Back), ta load lại số lượng giỏ hàng cũ cho chắc
+    _presenter.loadCartCount(widget.user.id!);
   }
 
   // --- HÀM XỬ LÝ MÀU SẮC ---
@@ -164,20 +185,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> implements Pr
   }
 
   //Buy now
-  void _handleBuyNow() async {
+  void _handleBuyNow() {
     if (_getAvailableColors().isNotEmpty && _selectedColor == null) {
       onError("Vui lòng chọn màu sắc trước khi mua!");
       return;
     }
-    _presenter.addToCart(widget.user, widget.product, color: _selectedColor, quantity: _quantity);
-
-    // Mua ngay thì nhảy thẳng sang trang Cart
-    await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => CartScreen(user: widget.user))
-    );
-    // Khi từ Cart quay về, nhớ đếm lại số lượng
-    _presenter.loadCartCount(widget.user.id!);
+    // GỌI HÀM PRESENTER (Không lưu giỏ hàng)
+    _presenter.buyNow(widget.product, _quantity);
   }
 
   @override
