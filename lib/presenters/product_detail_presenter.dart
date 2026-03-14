@@ -6,9 +6,10 @@ import '../db/database_helper.dart';
 abstract class ProductDetailView {
   void showLoading();
   void hideLoading();
-  void onAddToCartSuccess(); // Thông báo thêm vào giỏ thành công
-  void onError(String message); // Thông báo lỗi
-  void onUpdateCartCount(int count); // Cập nhật số lượng giỏ hàng
+  void onAddToCartSuccess();
+  void onError(String message);
+  void onUpdateCartCount(int count);
+  void onBuyNowSuccess(double totalAmount); // THÊM MỚI: Hợp đồng khi bấm Mua Ngay
 }
 
 // 2. LỚP XỬ LÝ LOGIC (PRESENTER)
@@ -17,10 +18,9 @@ class ProductDetailPresenter {
 
   ProductDetailPresenter(this._view);
 
-  // Hàm thêm vào giỏ hàng
+  // Hàm thêm vào giỏ hàng (Dùng cho nút Thêm Giỏ Hàng)
   void addToCart(User user, Product product, {int? lensId, String? color, int quantity = 1}) async {
     _view.showLoading();
-
     try {
       await DatabaseHelper.instance.addToCart(
           user.id!,
@@ -28,7 +28,7 @@ class ProductDetailPresenter {
           lensId,
           product.price,
           color: color,
-          quantity: quantity // Truyền số lượng xuống Database
+          quantity: quantity
       );
 
       _view.hideLoading();
@@ -37,6 +37,12 @@ class ProductDetailPresenter {
       _view.hideLoading();
       _view.onError("Lỗi khi thêm vào giỏ hàng: $e");
     }
+  }
+
+  // Hàm xử lý cho nút Mua Ngay
+  void buyNow(Product product, int quantity) {
+    double totalAmount = product.price * quantity;
+    _view.onBuyNowSuccess(totalAmount);
   }
 
   // Hàm đếm số lượng giỏ hàng
