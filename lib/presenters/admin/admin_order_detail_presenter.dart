@@ -1,11 +1,11 @@
 import '../../db/database_helper.dart';
-import '../../models/admin/admin_order_detail_item.dart';
+import '../../models/order_item.dart';
 
 abstract class AdminOrderDetailView {
   void showLoading();
   void hideLoading();
   void showOrderHeader(Map<String, dynamic> header);
-  void showOrderItems(List<AdminOrderDetailItem> items);
+  void showOrderItems(List<OrderItem> items);
   void showMessage(String message);
 }
 
@@ -28,13 +28,16 @@ class AdminOrderDetailPresenter {
       await DatabaseHelper.instance.getOrderItemsByOrderIdForAdmin(orderId);
 
       final items = rows.map((e) {
-        return AdminOrderDetailItem(
-          orderItemId: e['order_item_id'] as int,
+        return OrderItem(
+          id: e['order_item_id'] as int,
+          orderId: orderId,
+          productId: (e['product_id'] as int?) ?? 0,
+          lensProductId: e['lens_product_id'] as int?,
+          quantity: (e['quantity'] as num?)?.toInt() ?? 0,
+          price: (e['item_total_price'] as num?)?.toDouble() ?? 0,
           productName: (e['product_name'] ?? '').toString(),
           lensName: (e['lens_name'] ?? '').toString(),
           selectedColor: (e['selected_color'] ?? '').toString(),
-          quantity: (e['quantity'] as num?)?.toInt() ?? 0,
-          itemTotalPrice: (e['item_total_price'] as num?)?.toDouble() ?? 0,
           productImage: (e['product_image'] ?? '').toString(),
         );
       }).toList();

@@ -6,7 +6,8 @@ class User {
   final String email;
   final String phone;
   final String address;
-  final String role; // 'ADMIN', 'CUSTOMER', 'MANAGER'
+  final String role;
+  final String status;
 
   User({
     this.id,
@@ -17,18 +18,8 @@ class User {
     required this.phone,
     required this.address,
     required this.role,
+    this.status = 'ACTIVE',
   });
-
-  factory User.fromMap(Map<String, dynamic> json) => User(
-    id: json['user_id'],
-    username: json['username'] ?? '',  // Thêm ?? '' để chống lỗi Null
-    password: json['password'] ?? '',
-    fullName: json['full_name'] ?? '',
-    email: json['email'] ?? '',
-    phone: json['phone'] ?? '',
-    address: json['address'] ?? '',
-    role: json['role'] ?? 'CUSTOMER',
-  );
 
   Map<String, dynamic> toMap() {
     return {
@@ -40,6 +31,21 @@ class User {
       'phone': phone,
       'address': address,
       'role': role,
+      'status': status,
     };
+  }
+
+  factory User.fromMap(Map<String, dynamic> map) {
+    return User(
+      id: map['user_id'],
+      username: map['username'] ?? '',
+      password: map['password'] ?? '',
+      fullName: map['full_name'] ?? '',
+      email: map['email'] ?? '',
+      phone: map['phone'] ?? '',
+      address: map['address'] ?? '',
+      role: map['role'] ?? '',
+      status: map['status'] ?? 'ACTIVE',
+    );
   }
 }

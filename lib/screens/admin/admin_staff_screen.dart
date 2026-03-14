@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../models/admin/admin_user_item.dart';
+import '../../models/user.dart';
 import '../../presenters/admin/admin_staff_presenter.dart';
 
 class AdminStaffScreen extends StatefulWidget {
@@ -12,7 +12,7 @@ class AdminStaffScreen extends StatefulWidget {
 class _AdminStaffScreenState extends State<AdminStaffScreen>
     implements AdminStaffView {
   late AdminStaffPresenter _presenter;
-  List<AdminUserItem> _users = [];
+  List<User> _users = [];
   bool _isLoading = false;
 
   final Color bgColor = const Color(0xFFEAF4FF);
@@ -29,7 +29,7 @@ class _AdminStaffScreenState extends State<AdminStaffScreen>
   }
 
   @override
-  void showStaff(List<AdminUserItem> users) {
+  void showStaff(List<User> users) {
     setState(() {
       _users = users;
     });
@@ -79,7 +79,7 @@ class _AdminStaffScreenState extends State<AdminStaffScreen>
     );
   }
 
-  void _showStaffForm({AdminUserItem? user}) {
+  void _showStaffForm({User? user}) {
     final usernameController = TextEditingController(text: user?.username ?? '');
     final passwordController = TextEditingController();
     final fullNameController = TextEditingController(text: user?.fullName ?? '');
@@ -204,7 +204,7 @@ class _AdminStaffScreenState extends State<AdminStaffScreen>
 
                     if (isEdit) {
                       await _presenter.updateStaff(
-                        userId: user.id,
+                        userId: user.id!,
                         username: username,
                         fullName: fullName,
                         email: email,
@@ -326,7 +326,7 @@ class _AdminStaffScreenState extends State<AdminStaffScreen>
                       icon: Icon(Icons.edit_outlined, color: primaryColor),
                     ),
                     IconButton(
-                      onPressed: () => _confirmDelete(user.id),
+                      onPressed: () => _confirmDelete(user.id!),
                       icon: const Icon(Icons.delete_outline, color: Colors.red),
                     ),
                   ],

@@ -1,8 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../models/user.dart';
-import '../../models/admin/admin_menu_item.dart';
-import '../../models/admin/admin_dashboard_chart_data.dart';
+import '../../models/revenue_data.dart';
 import '../../presenters/admin/admin_dashboard_presenter.dart';
 import '../login_screen.dart';
 import 'admin_revenue_screen.dart';
@@ -26,9 +25,8 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     implements AdminDashboardView {
   late AdminDashboardPresenter _presenter;
-  List<AdminMenuItem> _items = [];
-  List<AdminDashboardPieItem> _pieItems = [];
-  List<AdminDashboardBarItem> _barItems = [];
+  List<Map<String, String>> _items = [];
+  RevenueData? _revenueData;
 
   final Color bgColor = const Color(0xFFEAF4FF);
   final Color cardColor = const Color(0xFFF8FBFF);
@@ -45,20 +43,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   }
 
   @override
-  void showMenuItems(List<AdminMenuItem> items) {
+  void showMenuItems(List<Map<String, String>> items) {
     setState(() {
       _items = items;
     });
   }
 
   @override
-  void showChartData({
-    required List<AdminDashboardPieItem> pieItems,
-    required List<AdminDashboardBarItem> barItems,
-  }) {
+  void showRevenueData(RevenueData data) {
     setState(() {
-      _pieItems = pieItems;
-      _barItems = barItems;
+      _revenueData = data;
     });
   }
 
@@ -235,16 +229,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     }
   }
 
-  Color _pieColor(int index) {
-    const colors = [
-      Color(0xFF67D0D5),
-      Color(0xFF49B3D1),
-      Color(0xFF348FBC),
-      Color(0xFF6AA8FF),
-    ];
-    return colors[index % colors.length];
-  }
-
   Widget _miniBar(String label, double value, double maxValue) {
     final ratio = maxValue == 0 ? 0.0 : value / maxValue;
     final height = math.max(36.0, ratio * 100).toDouble();
@@ -285,13 +269,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   }
 
   Widget _buildMiniRevenueCharts() {
-    final pieTotal = _pieItems.fold<double>(0, (sum, item) => sum + item.value);
-    double maxBarValue = 0;
-    for (final item in _barItems) {
-      if (item.value > maxBarValue) {
-        maxBarValue = item.value;
-      }
-    }
+    final pieItems = _revenueData?.pieData ?? [];
+    final barItems = _revenueData?.barData ?? [];
+    final pieTotal = pieItems.fold<double>(0, (sum, item) => sum + item.value);
+    final maxBarValue = _revenueData?.maxBarValue ?? 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -327,7 +308,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Doanh thu theo loại sản phẩm',
+                _revenueData?.pieTitle ?? 'Doanh thu theo loại sản phẩm',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -335,7 +316,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 ),
               ),
               const SizedBox(height: 12),
-              _pieItems.isEmpty
+              pieItems.isEmpty
                   ? const Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
                 child: Center(child: Text('Chưa có dữ liệu')),
@@ -347,10 +328,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                     height: 150,
                     child: CustomPaint(
                       painter: _MiniPieChartPainter(
-                        _pieItems
-                            .asMap()
-                            .entries
-                            .map((e) => _MiniSlice(_pieColor(e.key), e.value.value))
+                        pieItems
+                            .map((e) => _MiniSlice(e.color, e.value))
                             .toList(),
                       ),
                     ),
@@ -359,15 +338,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: _pieItems.asMap().entries.map((entry) {
-                        final percent = pieTotal == 0
-                            ? 0.0
-                            : (entry.value.value / pieTotal) * 100;
+                      children: pieItems.map((item) {
+                        final percent =
+                        pieTotal == 0 ? 0.0 : (item.value / pieTotal) * 100;
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: _LegendItem(
-                            color: _pieColor(entry.key),
-                            label: entry.value.label,
+                            color: item.color,
+                            label: item.label,
                             value: '${percent.toStringAsFixed(1)}%',
                           ),
                         );
@@ -402,7 +380,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Doanh thu 7 ngày gần nhất',
+                _revenueData?.barTitle ?? 'Doanh thu 7 ngày gần nhất',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -410,7 +388,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 ),
               ),
               const SizedBox(height: 14),
-              _barItems.isEmpty
+              barItems.isEmpty
                   ? const Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
                 child: Center(child: Text('Chưa có dữ liệu')),
@@ -419,7 +397,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 height: 150,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
-                  children: _barItems
+                  children: barItems
                       .map((item) => _miniBar(item.label, item.value, maxBarValue))
                       .toList(),
                 ),
@@ -458,19 +436,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             fontSize: 24,
           ),
         ),
-        actions: [
-          Builder(
-            builder: (context) => IconButton(
-              onPressed: () => Scaffold.of(context).openDrawer(),
-              icon: Icon(
-                Icons.menu_rounded,
-                color: iconColor,
-                size: 30,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -545,9 +510,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 ),
                 itemBuilder: (context, index) {
                   final item = _items[index];
+                  final title = item['title'] ?? '';
+                  final route = item['route'] ?? '';
+
                   return InkWell(
                     borderRadius: BorderRadius.circular(22),
-                    onTap: () => _navigateTo(item.route),
+                    onTap: () => _navigateTo(route),
                     child: Container(
                       decoration: BoxDecoration(
                         color: cardColor,
@@ -579,14 +547,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: Icon(
-                                _getMenuIcon(item.route),
+                                _getMenuIcon(route),
                                 color: primaryColor,
                                 size: 26,
                               ),
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              item.title,
+                              title,
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 15,

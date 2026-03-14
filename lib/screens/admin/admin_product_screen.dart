@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../models/admin/admin_product_item.dart';
+import '../../models/product.dart';
 import '../../presenters/admin/admin_product_presenter.dart';
 
 class AdminProductScreen extends StatefulWidget {
@@ -13,7 +13,7 @@ class AdminProductScreen extends StatefulWidget {
 class _AdminProductScreenState extends State<AdminProductScreen>
     implements AdminProductView {
   late AdminProductPresenter _presenter;
-  List<AdminProductItem> _products = [];
+  List<Product> _products = [];
   bool _isLoading = false;
 
   final Color bgColor = const Color(0xFFEAF4FF);
@@ -32,7 +32,7 @@ class _AdminProductScreenState extends State<AdminProductScreen>
   }
 
   @override
-  void showProducts(List<AdminProductItem> products) {
+  void showProducts(List<Product> products) {
     setState(() {
       _products = products;
     });
@@ -59,6 +59,19 @@ class _AdminProductScreenState extends State<AdminProductScreen>
     });
   }
 
+  String _getCategoryTypeFromId(int categoryId) {
+    switch (categoryId) {
+      case 1:
+        return 'FRAME';
+      case 2:
+        return 'LENS';
+      case 3:
+        return 'READY';
+      default:
+        return 'UNKNOWN';
+    }
+  }
+
   Color _typeColor(String type) {
     switch (type.toUpperCase()) {
       case 'FRAME':
@@ -70,6 +83,10 @@ class _AdminProductScreenState extends State<AdminProductScreen>
       default:
         return Colors.grey;
     }
+  }
+
+  String _formatMoney(double value) {
+    return '${_currencyFormat.format(value)} đ';
   }
 
   void _confirmDelete(int productId) {
@@ -105,7 +122,7 @@ class _AdminProductScreenState extends State<AdminProductScreen>
     );
   }
 
-  void _showProductForm({AdminProductItem? product}) {
+  void _showProductForm({Product? product}) {
     final nameController = TextEditingController(text: product?.name ?? '');
     final descriptionController =
     TextEditingController(text: product?.description ?? '');
@@ -118,7 +135,8 @@ class _AdminProductScreenState extends State<AdminProductScreen>
     final specsController = TextEditingController(text: product?.specs ?? '');
 
     String selectedType =
-    product?.categoryType.isNotEmpty == true ? product!.categoryType : 'FRAME';
+    product != null ? _getCategoryTypeFromId(product.categoryId) : 'FRAME';
+
     String selectedStatus =
     product?.status.isNotEmpty == true ? product!.status : 'ACTIVE';
 
@@ -144,7 +162,7 @@ class _AdminProductScreenState extends State<AdminProductScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       DropdownButtonFormField<String>(
-                        value: selectedType,
+                        initialValue: selectedType,
                         decoration: const InputDecoration(
                           labelText: 'Loại sản phẩm',
                           border: OutlineInputBorder(),
@@ -216,7 +234,7 @@ class _AdminProductScreenState extends State<AdminProductScreen>
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        value: selectedStatus,
+                        initialValue: selectedStatus,
                         decoration: const InputDecoration(
                           labelText: 'Trạng thái',
                           border: OutlineInputBorder(),
@@ -264,7 +282,7 @@ class _AdminProductScreenState extends State<AdminProductScreen>
 
                     if (isEdit) {
                       await _presenter.updateProduct(
-                        productId: product.id,
+                        productId: product.id!,
                         categoryType: selectedType,
                         name: name,
                         description: description,
@@ -297,8 +315,170 @@ class _AdminProductScreenState extends State<AdminProductScreen>
     );
   }
 
-  String _formatMoney(double value) {
-    return '${_currencyFormat.format(value)} đ';
+  Widget _buildProductCard(Product product) {
+    final categoryType = _getCategoryTypeFromId(product.categoryId);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 14,
+      ),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFD9E9FF),
+          width: 1.2,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x18000000),
+            blurRadius: 8,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE3F0FF),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: product.imageUrl.isNotEmpty
+                ? ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.network(
+                product.imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.image_not_supported_outlined,
+                  color: Color(0xFF2F6BFF),
+                ),
+              ),
+            )
+                : const Icon(
+              Icons.inventory_2_outlined,
+              color: Color(0xFF2F6BFF),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.name,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    color: titleColor,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _formatMoney(product.price),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: primaryColor,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Tồn kho: ${product.stock}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6B7A90),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _typeColor(categoryType).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Text(
+                        categoryType,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _typeColor(categoryType),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: product.status.toUpperCase() == 'ACTIVE'
+                            ? Colors.green.withValues(alpha: 0.12)
+                            : Colors.grey.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: Text(
+                        product.status,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: product.status.toUpperCase() == 'ACTIVE'
+                              ? Colors.green
+                              : Colors.grey[700],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Column(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F2FF),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  onPressed: () => _showProductForm(product: product),
+                  icon: Icon(
+                    Icons.edit_outlined,
+                    color: primaryColor,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFEBEE),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: IconButton(
+                  onPressed: () => _confirmDelete(product.id!),
+                  icon: const Icon(
+                    Icons.delete_outline,
+                    color: Colors.redAccent,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -410,162 +590,7 @@ class _AdminProductScreenState extends State<AdminProductScreen>
               itemCount: _products.length,
               itemBuilder: (context, index) {
                 final product = _products[index];
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 14),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                  decoration: BoxDecoration(
-                    color: cardColor,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: const Color(0xFFD9E9FF),
-                      width: 1.2,
-                    ),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x18000000),
-                        blurRadius: 8,
-                        offset: Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE3F0FF),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Center(
-                          child: Text(
-                            '#${product.id}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: titleColor,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              product.name,
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w600,
-                                color: titleColor,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              _formatMoney(product.price),
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: primaryColor,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Tồn kho: ${product.stock}',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF6B7A90),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 5,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _typeColor(product.categoryType)
-                                        .withOpacity(0.12),
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                  child: Text(
-                                    product.categoryType,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: _typeColor(product.categoryType),
-                                    ),
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 5,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: product.status.toUpperCase() == 'ACTIVE'
-                                        ? Colors.green.withOpacity(0.12)
-                                        : Colors.grey.withOpacity(0.16),
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                  child: Text(
-                                    product.status,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      color: product.status.toUpperCase() == 'ACTIVE'
-                                          ? Colors.green
-                                          : Colors.grey[700],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      Column(
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE8F2FF),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: IconButton(
-                              onPressed: () => _showProductForm(product: product),
-                              icon: Icon(
-                                Icons.edit_outlined,
-                                color: primaryColor,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFEBEE),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: IconButton(
-                              onPressed: () => _confirmDelete(product.id),
-                              icon: const Icon(
-                                Icons.delete_outline,
-                                color: Colors.redAccent,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
+                return _buildProductCard(product);
               },
             ),
           ),

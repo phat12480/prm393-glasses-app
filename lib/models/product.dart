@@ -7,7 +7,7 @@ class Product {
   final String imageUrl;
   final int stock;
   final String status;
-  final String? specs; // JSON String: lưu độ cận, chất liệu, v.v.
+  final String specs;
 
   Product({
     this.id,
@@ -18,19 +18,19 @@ class Product {
     required this.imageUrl,
     required this.stock,
     required this.status,
-    this.specs,
+    required this.specs,
   });
 
   factory Product.fromMap(Map<String, dynamic> json) => Product(
     id: json['product_id'],
-    categoryId: json['category_id'],
+    categoryId: json['category_id'] ?? 0,
     name: json['name'] ?? '',
     description: json['description'] ?? '',
-    price: (json['price'] as num?)?.toDouble() ?? 0.0, // Ép kiểu an toàn tránh lỗi int/double
-    imageUrl: json['image_url'] ?? '',                 // Thêm ?? '' để chống lỗi Null
+    price: (json['price'] as num?)?.toDouble() ?? 0,
+    imageUrl: json['image_url'] ?? '',
     stock: json['stock'] ?? 0,
-    status: json['status'] ?? '',
-    specs: json['specs'],
+    status: json['status'] ?? 'ACTIVE',
+    specs: json['specs'] ?? '',
   );
 
   Map<String, dynamic> toMap() {

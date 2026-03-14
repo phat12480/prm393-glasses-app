@@ -3,8 +3,11 @@ class Order {
   final int userId;
   final String orderDate;
   final double totalAmount;
-  final String status; // 'CART', 'PENDING', 'COMPLETED'
+  final String status;
   final String paymentMethod;
+
+  // field thêm cho admin UI
+  final String customerName;
 
   Order({
     this.id,
@@ -13,17 +16,20 @@ class Order {
     required this.totalAmount,
     required this.status,
     required this.paymentMethod,
+    this.customerName = '',
   });
 
   factory Order.fromMap(Map<String, dynamic> json) => Order(
     id: json['order_id'],
-    userId: json['user_id'],
-    orderDate: json['order_date'],
-    totalAmount: json['total_amount'] is String
-        ? double.parse(json['total_amount'])
-        : json['total_amount'], // SQLite đôi khi trả về int nếu số chẵn
-    status: json['status'],
-    paymentMethod: json['payment_method'],
+    userId: json['user_id'] ?? 0,
+    orderDate: json['order_date'] ?? '',
+    totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0,
+    status: json['status'] ?? '',
+    paymentMethod: json['payment_method'] ?? '',
+    customerName: json['customer_name'] ??
+        json['full_name'] ??
+        json['username'] ??
+        '',
   );
 
   Map<String, dynamic> toMap() {

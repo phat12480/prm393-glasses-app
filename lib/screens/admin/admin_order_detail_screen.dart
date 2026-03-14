@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../models/admin/admin_order_detail_item.dart';
+import '../../models/order_item.dart';
 import '../../presenters/admin/admin_order_detail_presenter.dart';
 
 class AdminOrderDetailScreen extends StatefulWidget {
@@ -21,7 +21,7 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen>
 
   bool _isLoading = false;
   Map<String, dynamic>? _header;
-  List<AdminOrderDetailItem> _items = [];
+  List<OrderItem> _items = [];
 
   final Color bgColor = const Color(0xFFEAF4FF);
   final Color cardColor = const Color(0xFFF8FBFF);
@@ -60,7 +60,7 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen>
   }
 
   @override
-  void showOrderItems(List<AdminOrderDetailItem> items) {
+  void showOrderItems(List<OrderItem> items) {
     setState(() {
       _items = items;
     });
@@ -264,7 +264,7 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen>
     );
   }
 
-  Widget _buildItemCard(AdminOrderDetailItem item) {
+  Widget _buildItemCard(OrderItem item) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(14),
@@ -350,7 +350,7 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _formatMoney(item.itemTotalPrice),
+                  _formatMoney(item.price),
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,

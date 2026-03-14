@@ -1,8 +1,8 @@
 import '../../db/database_helper.dart';
-import '../../models/admin/admin_user_item.dart';
+import '../../models/user.dart';
 
 abstract class AdminUserView {
-  void showUsers(List<AdminUserItem> users);
+  void showUsers(List<User> users);
   void showMessage(String message);
   void showLoading();
   void hideLoading();
@@ -20,13 +20,16 @@ class AdminUserPresenter {
       final result = await DatabaseHelper.instance.getCustomerUsersForAdmin();
 
       final users = result.map((e) {
-        return AdminUserItem(
+        return User(
           id: e['user_id'] as int,
           username: (e['username'] ?? '').toString(),
+          password: (e['password'] ?? '').toString(),
           fullName: (e['full_name'] ?? '').toString(),
           email: (e['email'] ?? '').toString(),
+          phone: (e['phone'] ?? '').toString(),
+          address: (e['address'] ?? '').toString(),
           role: (e['role'] ?? '').toString(),
-          status: (e['status'] ?? '').toString(),
+          status: (e['status'] ?? 'ACTIVE').toString(),
         );
       }).toList();
 

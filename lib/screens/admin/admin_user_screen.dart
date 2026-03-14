@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../models/admin/admin_user_item.dart';
+import '../../models/user.dart';
 import '../../presenters/admin/admin_user_presenter.dart';
 
 class AdminUserScreen extends StatefulWidget {
@@ -12,7 +12,7 @@ class AdminUserScreen extends StatefulWidget {
 class _AdminUserScreenState extends State<AdminUserScreen>
     implements AdminUserView {
   late AdminUserPresenter _presenter;
-  List<AdminUserItem> _users = [];
+  List<User> _users = [];
   bool _isLoading = false;
 
   final Color bgColor = const Color(0xFFEAF4FF);
@@ -29,7 +29,7 @@ class _AdminUserScreenState extends State<AdminUserScreen>
   }
 
   @override
-  void showUsers(List<AdminUserItem> users) {
+  void showUsers(List<User> users) {
     setState(() {
       _users = users;
     });
@@ -89,7 +89,7 @@ class _AdminUserScreenState extends State<AdminUserScreen>
     );
   }
 
-  void _showUserForm({AdminUserItem? user}) {
+  void _showUserForm({User? user}) {
     final usernameController = TextEditingController(text: user?.username ?? '');
     final passwordController = TextEditingController();
     final fullNameController = TextEditingController(text: user?.fullName ?? '');
@@ -232,7 +232,7 @@ class _AdminUserScreenState extends State<AdminUserScreen>
 
                     if (isEdit) {
                       await _presenter.updateUser(
-                        userId: user.id,
+                        userId: user.id!,
                         username: username,
                         fullName: fullName,
                         email: email,
@@ -519,7 +519,7 @@ class _AdminUserScreenState extends State<AdminUserScreen>
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: IconButton(
-                              onPressed: () => _confirmDelete(user.id),
+                              onPressed: () => _confirmDelete(user.id!),
                               icon: const Icon(
                                 Icons.delete_outline,
                                 color: Colors.redAccent,

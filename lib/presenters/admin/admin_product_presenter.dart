@@ -1,8 +1,8 @@
 import '../../db/database_helper.dart';
-import '../../models/admin/admin_product_item.dart';
+import '../../models/product.dart';
 
 abstract class AdminProductView {
-  void showProducts(List<AdminProductItem> products);
+  void showProducts(List<Product> products);
   void showMessage(String message);
   void showLoading();
   void hideLoading();
@@ -20,10 +20,9 @@ class AdminProductPresenter {
       final result = await DatabaseHelper.instance.getAllProductsForAdmin();
 
       final products = result.map((e) {
-        return AdminProductItem(
+        return Product(
           id: e['product_id'] as int,
-          categoryId: (e['category_id'] as int?) ?? 0,
-          categoryType: (e['category_type'] ?? '').toString(),
+          categoryId: (e['category_id'] ?? 0) as int,
           name: (e['name'] ?? '').toString(),
           description: (e['description'] ?? '').toString(),
           price: (e['price'] as num?)?.toDouble() ?? 0,

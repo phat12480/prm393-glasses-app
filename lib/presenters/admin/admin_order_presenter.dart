@@ -1,8 +1,8 @@
 import '../../db/database_helper.dart';
-import '../../models/admin/admin_order_item.dart';
+import '../../models/order.dart';
 
 abstract class AdminOrderView {
-  void showOrders(List<AdminOrderItem> orders);
+  void showOrders(List<Order> orders);
   void showMessage(String message);
   void showLoading();
   void hideLoading();
@@ -23,14 +23,14 @@ class AdminOrderPresenter {
         final fullName = (e['full_name'] ?? '').toString();
         final username = (e['username'] ?? '').toString();
 
-        return AdminOrderItem(
+        return Order(
           id: e['order_id'] as int,
           userId: (e['user_id'] as int?) ?? 0,
-          customerName: fullName.isNotEmpty ? fullName : username,
           orderDate: (e['order_date'] ?? '').toString(),
           totalAmount: (e['total_amount'] as num?)?.toDouble() ?? 0,
           status: (e['status'] ?? '').toString(),
           paymentMethod: (e['payment_method'] ?? '').toString(),
+          customerName: fullName.isNotEmpty ? fullName : username,
         );
       }).toList();
 

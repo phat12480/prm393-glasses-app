@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../models/admin/admin_order_item.dart';
+import '../../models/order.dart';
 import '../../presenters/admin/admin_order_presenter.dart';
 import 'admin_order_detail_screen.dart';
 
@@ -14,7 +14,7 @@ class AdminOrderScreen extends StatefulWidget {
 class _AdminOrderScreenState extends State<AdminOrderScreen>
     implements AdminOrderView {
   late AdminOrderPresenter _presenter;
-  List<AdminOrderItem> _orders = [];
+  List<Order> _orders = [];
   bool _isLoading = false;
 
   final Color bgColor = const Color(0xFFEAF4FF);
@@ -33,7 +33,7 @@ class _AdminOrderScreenState extends State<AdminOrderScreen>
   }
 
   @override
-  void showOrders(List<AdminOrderItem> orders) {
+  void showOrders(List<Order> orders) {
     setState(() {
       _orders = orders;
     });
@@ -77,7 +77,7 @@ class _AdminOrderScreenState extends State<AdminOrderScreen>
     return '${_currencyFormat.format(value)} đ';
   }
 
-  void _showStatusDialog(AdminOrderItem order) {
+  void _showStatusDialog(Order order) {
     String selectedStatus = order.status.isEmpty ? 'PENDING' : order.status;
 
     showDialog(
@@ -125,7 +125,7 @@ class _AdminOrderScreenState extends State<AdminOrderScreen>
                   onPressed: () async {
                     Navigator.pop(context);
                     await _presenter.updateOrderStatus(
-                      orderId: order.id,
+                      orderId: order.id!,
                       status: selectedStatus,
                     );
                   },
@@ -172,7 +172,7 @@ class _AdminOrderScreenState extends State<AdminOrderScreen>
     );
   }
 
-  Widget _buildOrderCard(AdminOrderItem order) {
+  Widget _buildOrderCard(Order order) {
     final safeDate = order.orderDate.isEmpty
         ? 'Không có ngày'
         : order.orderDate.substring(
@@ -186,7 +186,7 @@ class _AdminOrderScreenState extends State<AdminOrderScreen>
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => AdminOrderDetailScreen(orderId: order.id),
+            builder: (_) => AdminOrderDetailScreen(orderId: order.id!),
           ),
         );
       },
@@ -332,7 +332,7 @@ class _AdminOrderScreenState extends State<AdminOrderScreen>
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: IconButton(
-                    onPressed: () => _confirmDelete(order.id),
+                    onPressed: () => _confirmDelete(order.id!),
                     icon: const Icon(
                       Icons.delete_outline,
                       color: Colors.redAccent,
